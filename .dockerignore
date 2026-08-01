@@ -1,0 +1,29 @@
+# VCS
+.git
+.gitignore
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Test / quality caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.dist/
+
+# Secrets — NEVER build secrets into the image
+.env
+.env.local
+*.pem
+
+# Local Windows helper + Streamlit logs (not needed in the image)
+run_streamlit.bat
+streamlit_err.txt
+streamlit_out.txt

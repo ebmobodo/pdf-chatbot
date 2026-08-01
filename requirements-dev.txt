@@ -1,0 +1,6 @@
+-r requirements.txt
+
+# Test / quality tooling (local + CI only, NOT shipped in the Docker image)
+pytest==9.1.1
+pytest-cov>=6.0,<8
+ruff==0.15.22
