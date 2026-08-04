@@ -22,6 +22,12 @@ from src.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
+
+def _sanitize_for_log(value: str) -> str:
+    """Remove line breaks from untrusted text before writing to logs."""
+    return value.replace("\r", " ").replace("\n", " ")
+
+
 _SYSTEM_PROMPT = (
     "You are a helpful assistant that answers questions based strictly on the "
     "provided context. If the context does not contain the answer, say so."
@@ -49,8 +55,9 @@ def ask_question(query: str, retriever: VectorStoreRetriever) -> str:
     llm = _build_llm(settings)
     combine_chain = create_stuff_documents_chain(llm, prompt)
     chain = create_retrieval_chain(retriever, combine_chain)
+    sanitized_query = _sanitize_for_log(query)
 
-    logger.debug("Generating answer for query: %s", query)
+    logger.debug("Generating answer for query: %s", sanitized_query)
     logger.info("Dispatching API call to Gemini model: %s", settings.llm_model)
     try:
         result = chain.invoke({"input": query})
@@ -58,7 +65,7 @@ def ask_question(query: str, retriever: VectorStoreRetriever) -> str:
         logger.exception(
             "Gemini API call failed for model %s on query %r",
             settings.llm_model,
-            query,
+            sanitized_query,
         )
         raise
     logger.info("Gemini API call to model %s completed", settings.llm_model)
