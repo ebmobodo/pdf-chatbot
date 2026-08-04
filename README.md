@@ -6,8 +6,8 @@ answer grounded strictly in the document's content.
 
 Built with **Streamlit**, **LangChain**, **Supabase (pgvector)**, **NVIDIA
 NIM embeddings**, and **Google Gemini**, with an optional **OCR fallback**
-for scanned documents. Containerized for deployment to **Hugging Face
-Spaces (Docker SDK)**.
+for scanned documents. Containerized for deployment to **Render**
+(Docker Web Service).
 
 ---
 
@@ -52,14 +52,14 @@ pdf-chatbot/
 │   └── llm_chain.py           # Gemini RAG chain
 ├── tests/                     # pytest suite (mocked external services)
 ├── scripts/
-│   └── start.sh               # Production entrypoint (port 7860)
-├── Dockerfile                 # HF Spaces-optimized production image
+│   └── start.sh               # Production entrypoint (port 8500)
+├── Dockerfile                 # Render-optimized production image
 ├── .dockerignore
 ├── requirements.txt           # Locked runtime dependencies
 ├── requirements-dev.txt       # Test / quality tooling
 ├── pyproject.toml             # pytest + ruff configuration
 ├── .env.example               # Template for environment variables
-└── DEPLOYMENT.md              # Hugging Face Space deployment playbook
+└── DEPLOYMENT.md              # Render deployment playbook
 ```
 
 ---
@@ -109,7 +109,7 @@ ruff check .
 | `NVIDIA_API_KEY`        |   yes    | —                                | NVIDIA NIM API key                   |
 | `SUPABASE_URL`          |   yes    | —                                | Supabase project URL                 |
 | `SUPABASE_SERVICE_KEY`  |   yes    | —                                | Supabase service-role key            |
-| `LLM_MODEL`             |   no     | `gemini-1.5-flash`               | Gemini model                         |
+| `LLM_MODEL`             |   no     | `gemini-2.5-flash`               | Gemini model                         |
 | `LLM_TEMPERATURE`       |   no     | `0.3`                            | LLM sampling temperature             |
 | `EMBED_MODEL`           |   no     | `nvidia/nv-embedqa-e5-v5`        | NVIDIA embedding model               |
 | `EMBED_BASE_URL`        |   no     | `https://integrate.api.nvidia.com/v1` | NVIDIA NIM endpoint             |
@@ -124,16 +124,17 @@ ruff check .
 
 ```bash
 docker build -t pdf-chatbot .
-docker run --rm -p 7860:7860 \
+docker run --rm -p 8500:8500 \
+  -e PORT=8500 \
   -e GOOGLE_API_KEY=... \
   -e NVIDIA_API_KEY=... \
   -e SUPABASE_URL=... \
   -e SUPABASE_SERVICE_KEY=... \
   pdf-chatbot
-# open http://localhost:7860
+# open http://localhost:8500
 ```
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for the full Hugging Face Spaces setup.
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for the full Render setup.
 
 ## Known technical debt
 
