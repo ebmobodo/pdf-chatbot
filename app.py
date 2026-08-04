@@ -10,7 +10,6 @@ from __future__ import annotations
 import logging
 
 import streamlit as st
-
 from src.config import get_settings
 from src.document_processor import process_pdf_bytes
 from src.llm_chain import ask_question

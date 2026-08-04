@@ -1,11 +1,52 @@
+[project]
+name = "pdf-chatbot"
+description = "Retrieval-Augmented Generation (RAG) chatbot that answers questions from uploaded PDFs."
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-ra"
 
+[tool.coverage.run]
+source = ["src", "app.py"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 80
+exclude_lines = [
+    "if TYPE_CHECKING:",
+    "pragma: no cover",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+src = ["src", "tests", "app.py"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP"]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src/"]
+mypy_path = "."
+ignore_missing_imports = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+exclude = ["tests/"]
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", ".git"]
+skips = ["B101", "B307"]
