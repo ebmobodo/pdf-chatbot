@@ -11,9 +11,11 @@ class TestAskQuestion:
     def test_returns_answer_string(self):
         from src.llm_chain import ask_question
 
-        with patch("src.llm_chain._build_llm"), \
-                patch("src.llm_chain.create_stuff_documents_chain") as MockStuff, \
-                patch("src.llm_chain.create_retrieval_chain") as MockRetrieval:
+        with (
+            patch("src.llm_chain._build_llm"),
+            patch("src.llm_chain.create_stuff_documents_chain") as MockStuff,
+            patch("src.llm_chain.create_retrieval_chain") as MockRetrieval,
+        ):
             mock_combine = MagicMock()
             MockStuff.return_value = mock_combine
 
@@ -28,9 +30,11 @@ class TestAskQuestion:
     def test_passes_query_to_chain(self):
         from src.llm_chain import ask_question
 
-        with patch("src.llm_chain._build_llm"), \
-                patch("src.llm_chain.create_stuff_documents_chain") as MockStuff, \
-                patch("src.llm_chain.create_retrieval_chain") as MockRetrieval:
+        with (
+            patch("src.llm_chain._build_llm"),
+            patch("src.llm_chain.create_stuff_documents_chain") as MockStuff,
+            patch("src.llm_chain.create_retrieval_chain") as MockRetrieval,
+        ):
             mock_combine = MagicMock()
             MockStuff.return_value = mock_combine
 
@@ -45,9 +49,11 @@ class TestAskQuestion:
     def test_creates_retrieval_chain(self):
         from src.llm_chain import ask_question
 
-        with patch("src.llm_chain._build_llm"), \
-                patch("src.llm_chain.create_stuff_documents_chain") as MockStuff, \
-                patch("src.llm_chain.create_retrieval_chain") as MockRetrieval:
+        with (
+            patch("src.llm_chain._build_llm"),
+            patch("src.llm_chain.create_stuff_documents_chain") as MockStuff,
+            patch("src.llm_chain.create_retrieval_chain") as MockRetrieval,
+        ):
             mock_combine = MagicMock()
             MockStuff.return_value = mock_combine
 
@@ -69,11 +75,39 @@ class TestAskQuestion:
             supabase_service_key="k",
             google_api_key="g",
             nvidia_api_key="n",
-            llm_model="gemini-2.0-flash",
+            llm_model="gemini-2.5-flash",
             llm_temperature=0.1,
         )
 
         with patch("src.llm_chain.ChatGoogleGenerativeAI") as MockLLM:
             _build_llm(settings)
 
-        MockLLM.assert_called_once_with(model="gemini-2.0-flash", temperature=0.1)
+        MockLLM.assert_called_once_with(model="gemini-2.5-flash", temperature=0.1)
+
+    def test_reraises_and_logs_on_api_failure(self, caplog):
+        """ask_question should log the failing model and re-raise on API errors."""
+        import logging
+
+        from src.llm_chain import ask_question
+
+        with (
+            patch("src.llm_chain._build_llm"),
+            patch("src.llm_chain.create_stuff_documents_chain") as MockStuff,
+            patch("src.llm_chain.create_retrieval_chain") as MockRetrieval,
+        ):
+            mock_combine = MagicMock()
+            MockStuff.return_value = mock_combine
+
+            mock_chain = MagicMock()
+            mock_chain.invoke.side_effect = RuntimeError("API exploded")
+            MockRetrieval.return_value = mock_chain
+
+            with caplog.at_level(logging.INFO, logger="src.llm_chain"):
+                try:
+                    ask_question("boom", MagicMock())
+                except RuntimeError as exc:
+                    assert str(exc) == "API exploded"
+                else:
+                    raise AssertionError("expected RuntimeError")
+
+            assert any("gemini-2.5-flash" in rec.message for rec in caplog.records)

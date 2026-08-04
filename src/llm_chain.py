@@ -51,5 +51,15 @@ def ask_question(query: str, retriever: VectorStoreRetriever) -> str:
     chain = create_retrieval_chain(retriever, combine_chain)
 
     logger.debug("Generating answer for query: %s", query)
-    result = chain.invoke({"input": query})
+    logger.info("Dispatching API call to Gemini model: %s", settings.llm_model)
+    try:
+        result = chain.invoke({"input": query})
+    except Exception:
+        logger.exception(
+            "Gemini API call failed for model %s on query %r",
+            settings.llm_model,
+            query,
+        )
+        raise
+    logger.info("Gemini API call to model %s completed", settings.llm_model)
     return result["answer"]

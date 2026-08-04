@@ -5,8 +5,8 @@ pipeline parameters are read from the environment here so that no secrets
 or settings are hardcoded across the codebase.
 
 Local development: copy ``.env.example`` to ``.env`` and fill in values.
-Hugging Face Spaces: provide the same values as Repository Secrets
-(see DEPLOYMENT.md). Values here must never be committed to source
+Render: provide the same values as environment variables in the Render
+dashboard (see DEPLOYMENT.md). Values here must never be committed to source
 control.
 """
 
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-DEFAULT_LLM_MODEL = "gemini-1.5-flash"
+DEFAULT_LLM_MODEL = "gemini-2.5-flash"
 DEFAULT_LLM_TEMPERATURE = 0.3
 DEFAULT_EMBED_MODEL = "nvidia/nv-embedqa-e5-v5"
 DEFAULT_EMBED_BASE_URL = "https://integrate.api.nvidia.com/v1"
@@ -132,8 +132,8 @@ class Settings:
             raise RuntimeError(
                 "Missing required environment variable(s): "
                 + ", ".join(missing)
-                + ". Set them in a .env file (local) or as Hugging Face Space "
-                "secrets (production) before running the app."
+                + ". Set them in a .env file (local) or as Render environment "
+                "variables (production) before running the app."
             )
 
 
