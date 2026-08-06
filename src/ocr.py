@@ -33,8 +33,7 @@ def extract_text_from_pdf_page(
     """Return OCR text for the page at ``page_index`` (0-based)."""
     if convert_from_bytes is None or pytesseract is None:
         logger.warning(
-            "OCR requested but pdf2image/pytesseract are not installed; "
-            "page %d will be skipped.",
+            "OCR requested but pdf2image/pytesseract are not installed; page %d will be skipped.",
             page_index + 1,
         )
         return ""

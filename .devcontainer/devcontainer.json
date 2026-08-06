@@ -1,0 +1,52 @@
+// Dev container configuration for PDF Chat Bot.
+//
+// Builds the Python 3.12 image from .devcontainer/Dockerfile, installs dev
+// tooling, forwards Streamlit's port, and wires up recommended VS Code
+// extensions. Read more: https://containers.dev
+{
+  "name": "pdf-chatbot",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "forwardPorts": [8500],
+  "portsAttributes": {
+    "8500": {
+      "label": "Streamlit",
+      "onAutoForward": "notify"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff",
+        "ms-python.mypy-type-checker",
+        "ms-python.debugpy",
+        "ms-toolsai.jupyter",
+        "yzhang.markdown-all-in-one",
+        "EditorConfig.EditorConfig"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.analysis.typeCheckingMode": "basic",
+        "ruff.lint.enable": true,
+        "ruff.format.enable": true,
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "explicit"
+        },
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff"
+        },
+        "mypy-type-checker.args": ["--config-file", "pyproject.toml"],
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["tests"]
+      }
+    }
+  },
+  "postCreateCommand": "pip install -r requirements-dev.txt && pre-commit install",
+  "postStartCommand": "git config --global --add safe.directory ${containerWorkspaceFolder}",
+  "remoteUser": "root"
+}

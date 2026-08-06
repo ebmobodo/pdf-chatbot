@@ -1,120 +1,94 @@
-# Deployment Playbook — Hugging Face Spaces (Docker SDK)
+# Deployment Playbook — Render (Docker Web Service)
 
-This guide walks through deploying the **PDF Chat Bot** to a Hugging Face
-Space, under either a personal account or an organization. The Space uses
-the **Docker SDK** and runs the image built from the repository's
-`Dockerfile` (Streamlit on port `7860`).
+This guide walks through deploying the **PDF Chat Bot** to Render as a
+Docker web service. Render builds the image from the repository's
+`Dockerfile` and runs `scripts/start.sh`, which serves Streamlit on
+`PORT` (default **8500**).
 
 ---
 
 ## 1. Prerequisites
 
-- A Hugging Face account. If you deploy under an organization, create (or
-  have access to) the organization: <https://huggingface.co/organizations/new>
-- Git installed and configured (`git config --global user.name/email`).
-- Docker (optional) to test the image locally before pushing.
+- A Render account: <https://dashboard.render.com>
+- The repository hosted on GitHub (Render builds from it).
+- Docker (optional) to test the image locally before deploying.
 - The four required credentials for this app:
 
-  | Secret                | Where to get it |
-  | --------------------- | --------------- |
-  | `GOOGLE_API_KEY`      | <https://aistudio.google.com/apikey> |
-  | `NVIDIA_API_KEY`      | <https://build.nvidia.com> → API keys |
-  | `SUPABASE_URL`        | Supabase project → Settings → API |
-  | `SUPABASE_SERVICE_KEY`| Supabase project → Settings → API → `service_role` key |
+  | Variable            | Where to get it |
+  | ------------------- | --------------- |
+  | `GOOGLE_API_KEY`    | <https://aistudio.google.com/apikey> |
+  | `NVIDIA_API_KEY`    | <https://build.nvidia.com> → API keys |
+  | `SUPABASE_URL`      | Supabase project → Settings → API |
+  | `SUPABASE_SERVICE_KEY` | Supabase project → Settings → API → `service_role` key |
 
 ---
 
-## 2. Create a Hugging Face User Access Token (write)
+## 2. Deploy with the Blueprint (`render.yaml`)
 
-The token is used to push the Space code. A token with **write** access on
-the target account/org is required.
+`render.yaml` defines the whole service. The recommended path is to push
+it to your GitHub repo and let Render pick it up:
 
-1. Go to <https://huggingface.co/settings/tokens>.
-2. Click **Create new token**.
-3. Give it a name (e.g. `pdf-chatbot-deploy`).
-4. Role: **Write** (for the account that owns the Space).
-5. If deploying under an organization, create the token **inside the
-   organization's settings** (org → Settings → Tokens) so it has write
-   access to the org Space.
-6. **Copy the token immediately** — it is only shown once. Treat it as a
-   secret: store it in your OS keychain / a password manager. Never commit
-   it to Git.
+1. Push this repository to GitHub (make sure `render.yaml` is included).
+2. In the Render dashboard, go to **New → Blueprint** and select the repo.
+3. Render creates the web service from `render.yaml`:
+   - runtime: **docker**
+   - `PORT=8500`
+   - `healthCheckPath=/_stcore/health`
+   - plan: **free**
+4. Render will create the service but it **will not start yet** — the four
+   required API keys are marked `sync: false` and must be added manually
+   (step 3).
 
----
+### Manual alternative (Dashboard)
 
-## 3. Create the Space (Docker SDK / Blank)
-
-### Option A — Web UI (simplest)
-
-1. Go to <https://huggingface.co/new-space>.
-2. **Owner**: choose your username or the organization.
-3. **Space name**: e.g. `pdf-chatbot`.
-4. **License**: pick MIT (matches this repo).
-5. **Select the Space SDK**: **Docker**.
-6. **Docker template**: **Blank**.
-7. **Hardware**: start with the free **CPU basic** tier.
-8. Click **Create Space**.
-
-### Option B — CLI
-
-```bash
-pip install huggingface_hub
-huggingface-cli login                    # paste your write token
-
-# Personal space
-huggingface-cli repo create pdf-chatbot --type space --space_sdk docker
-
-# Organization space
-huggingface-cli repo create pdf-chatbot \
-  --type space --space_sdk docker --organization YOUR_ORG_NAME
-```
-
-> The Space will initially fail to start (no Dockerfile yet). That is
-> expected — we push the code in step 5.
+1. Render dashboard → **New → Web Service** → connect your GitHub repo.
+2. **Runtime**: Docker.
+3. **Health Check Path**: `/_stcore/health`.
+4. Set **Start Command** to `bash scripts/start.sh` (the Dockerfile already
+   sets this; leave it if using the Dockerfile's `CMD`).
+5. Create the service, then set env vars (step 3).
 
 ---
 
-## 4. Configure Space Secrets (Repository Secrets)
+## 3. Set the required environment variables
 
-HF Space **secrets** become environment variables inside the container at
-runtime. They are the production equivalent of the local `.env` file.
+The API keys have `sync: false` in `render.yaml` — they are intentionally
+**not** committed to the repo. Set them in the Render dashboard:
 
-1. Open the Space you just created.
-2. Go to **Settings** → **Variables and secrets**.
-3. Under **Secrets**, add each of these (click *Add a secret* per row):
+1. Open the service → **Environment** tab.
+2. Add each variable (as a secret so it is not shown in plain text):
 
-   | Name                 | Value                                        |
-   | -------------------- | -------------------------------------------- |
-   | `GOOGLE_API_KEY`     | your Gemini key                              |
-   | `NVIDIA_API_KEY`     | your NVIDIA NIM key                          |
-   | `SUPABASE_URL`       | e.g. `https://xyz.supabase.co`               |
-   | `SUPABASE_SERVICE_KEY` | your `service_role` key                    |
+   | Name                 | Value                            |
+   | -------------------- | -------------------------------- |
+   | `GOOGLE_API_KEY`     | your Gemini key                  |
+   | `NVIDIA_API_KEY`     | your NVIDIA NIM key              |
+   | `SUPABASE_URL`       | e.g. `https://xyz.supabase.co`   |
+   | `SUPABASE_SERVICE_KEY` | your `service_role` key        |
 
-4. Optional tuning secrets (same values as `.env.example`):
+3. Optional tuning variables (same names/defaults as `.env.example`):
 
    | Name | Example |
    | ---- | ------- |
-   | `LLM_MODEL` | `gemini-1.5-flash` |
+   | `LLM_MODEL` | `gemini-2.5-flash` |
    | `LLM_TEMPERATURE` | `0.3` |
    | `EMBED_MODEL` | `nvidia/nv-embedqa-e5-v5` |
    | `CHUNK_SIZE` | `1000` |
    | `CHUNK_OVERLAP` | `200` |
-   | `OCR_ENABLED` | `true` (requires the OCR system deps already in the Dockerfile) |
+   | `OCR_ENABLED` | `true` |
 
-5. Optionally, under **Variables**, you can add non-secret env overrides.
-
-> The Dockerfile ships `poppler-utils` + `tesseract-ocr`, so
-> `OCR_ENABLED=true` works out of the box in the Space.
+> **OCR caveat:** the Dockerfile does **not** install the OCR system
+> packages (`poppler-utils`, `tesseract-ocr`). With `OCR_ENABLED=true` but
+> no packages, OCR degrades gracefully (falls back to pypdf text). To fully
+> enable OCR in production you must add those packages to the `Dockerfile`.
 
 ---
 
-## 5. Test the image locally (optional but recommended)
+## 4. Test the image locally (optional but recommended)
 
 ```bash
-cd pdf-chatbot
-
 docker build -t pdf-chatbot .
-docker run --rm -p 7860:7860 \
+docker run --rm -p 8500:8500 \
+  -e PORT=8500 \
   -e GOOGLE_API_KEY=... \
   -e NVIDIA_API_KEY=... \
   -e SUPABASE_URL=... \
@@ -122,90 +96,65 @@ docker run --rm -p 7860:7860 \
   pdf-chatbot
 ```
 
-Open <http://localhost:7860>, upload a PDF, and confirm the chat works
-before deploying.
+Open <http://localhost:8500>, upload a PDF, and confirm the chat works
+before deploying. Verify the health endpoint too:
+`curl http://localhost:8500/_stcore/health`.
 
 ---
 
-## 6. Deploy by pushing to Hugging Face
+## 5. Deploy & trigger builds
 
-1. **Add the Space as a remote** (replace `YOUR_ORG_NAME`/`SPACE_NAME`):
+- **Auto-deploy:** after the service is created, every push to the
+  connected branch triggers a new build and release.
+- **Manual deploy:** service → **Manual Deploy → Deploy latest commit**.
+- Watch the build in the service **Events** tab. First build takes a few
+  minutes (apt + pip install of the LangChain/Streamlit stack); later
+  builds are faster thanks to Docker layer caching.
 
-   ```bash
-   cd pdf-chatbot
-
-   # If this directory is not yet a Git repo:
-   git init
-   git add .
-   git commit -m "Initial release"
-
-   # Personal space
-   git remote add hf https://huggingface.co/spaces/USERNAME/pdf-chatbot
-
-   # Organization space
-   git remote add hf https://huggingface.co/spaces/YOUR_ORG_NAME/pdf-chatbot
-   ```
-
-2. **Push** (you may be prompted for the write token):
-
-   ```bash
-   git push hf main
-   ```
-
-3. Hugging Face detects the commit and automatically builds the Docker
-   image. Watch progress under the Space's **Runtime** tab or in
-   **Settings → Builds**.
-
-4. When the build finishes, the app is live at:
-
-   ```
-   https://huggingface.co/spaces/YOUR_ORG_NAME/pdf-chatbot
-   ```
-
-> First build takes a few minutes (apt packages + pip install of the
-> LangChain/Streamlit stack). Subsequent builds are much faster thanks to
-> Docker layer caching.
+The app is live at `https://<service-name>.onrender.com`.
 
 ---
 
-## 7. Rolling out updates
+## 6. Rolling out updates
 
 ```bash
 git add .
 git commit -m "Describe the change"
-git push hf main
+git push origin main
 ```
 
-HF rebuilds and hot-swaps the running Space. To hard-restart after a
-deployment: **Settings → Danger Zone → Restart space**.
+Auto-deploy builds and swaps the running service. To hard-restart:
+service → **Manual Deploy** or the **Restart** button in the service menu.
 
 ---
 
-## 8. Scaling & hardening notes
+## 7. Scaling & hardening notes
 
-- **Sleep / cold start:** free and `cpu-basic` Spaces sleep after
-  inactivity; the app restarts on the next visit (takes ~10–20 s).
-- **Upgrade hardware:** Settings → Hardware → `cpu-upgrade` (2 vCPU) for
-  faster PDF processing, or GPU tiers if you later run local models.
+- **Sleep / cold start:** the free tier sleeps after 15 minutes of
+  inactivity; the next request wakes it (takes ~30–60 s). A `cron-job.org`
+  ping to `/_stcore/health` every ~10 minutes keeps it warm.
+- **Upgrade:** the free instance is 512 MB RAM / 0.1 CPU; PDF-heavy loads
+  benefit from a paid plan (1 GB+ / 0.5 CPU).
 - **Keep secrets out of the image:** `.dockerignore` already excludes
-  `.env`; always pass credentials via Space secrets.
+  `.env`; always pass credentials via Render env vars / secrets.
 - **Pin dependencies:** `requirements.txt` is locked; bump deliberately.
-- **Rotate the HF token** if it is ever exposed, and use the
-  **organization** for team collaboration (members get their own tokens).
+- **Health check:** `/_stcore/health` is used by Render; keep it reachable
+  (Streamlit exposes it by default).
 
 ---
 
-## 9. Troubleshooting
+## 8. Troubleshooting
 
 | Symptom | Likely cause | Fix |
 | ------- | ------------ | --- |
-| Space build fails | Syntax error or missing package | Check **Settings → Builds** logs; run `docker build` locally |
-| `httpx.ConnectError: getaddrinfo failed` | Supabase URL hostname unreachable / typo | Confirm `SUPABASE_URL` secret, check network egress |
-| `Missing required environment variable(s)` | Secrets not set | Re-check **Settings → Variables and secrets** |
-| `401 Invalid API key` | Wrong/rotated key | Rotate the key, update the secret, restart the Space |
-| Empty answers / "no context" | Nothing embedded yet, or OCR disabled on scanned PDFs | Process a PDF first; set `OCR_ENABLED=true` |
-| OCR returns empty on scanned pages | `poppler-utils`/`tesseract-ocr` missing in image | Already installed in `Dockerfile`; verify the image was rebuilt |
-| Port already in use (local) | Another process on 7860 | Run with `--server.port=8501` locally |
+| Deploy fails / container crashes | Missing env vars | App crashes at startup if the 4 required vars are absent; set them in **Environment** |
+| `Missing required environment variable(s)` | Vars not set or not redeployed | Add vars, then **Manual Deploy → Clear build cache & deploy** |
+| `httpx.ConnectError: getaddrinfo failed` | Supabase URL hostname unreachable / typo | Confirm `SUPABASE_URL`, check network egress |
+| `401 Invalid API key` | Wrong/rotated key | Rotate the key, update the env var, redeploy |
+| Health check failing | Port mismatch | `PORT` must be set to 8500; app listens on `$PORT` via `scripts/start.sh` |
+| Empty answers / "no context" | Nothing embedded yet, or OCR disabled on scanned PDFs | Process a PDF first; enable `OCR_ENABLED=true` |
+| OCR returns empty on scanned pages | `poppler-utils`/`tesseract-ocr` missing in image | Add them to the `Dockerfile`; they are not installed by default |
+| Port already in use (local) | Another process on 8500 | Run with `-e PORT=8501 -p 8501:8501` |
 
 ---
 
@@ -228,4 +177,4 @@ is configured in `opencode.json`:
 
 Authenticate once with `opencode mcp auth supabase`, which opens a browser
 OAuth flow. This is developer tooling only — it is not required for the
-Space deployment.
+Render deployment.

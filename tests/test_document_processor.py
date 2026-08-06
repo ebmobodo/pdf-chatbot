@@ -22,9 +22,11 @@ class TestProcessPdfBytes:
         from src.document_processor import process_pdf_bytes
 
         converter, mock_tmp = self._make_text()
-        with patch("src.document_processor._get_converter", return_value=converter), \
-                patch("src.document_processor.tempfile.NamedTemporaryFile") as MockTmp, \
-                patch("src.document_processor.Path.unlink"):
+        with (
+            patch("src.document_processor._get_converter", return_value=converter),
+            patch("src.document_processor.tempfile.NamedTemporaryFile") as MockTmp,
+            patch("src.document_processor.Path.unlink"),
+        ):
             MockTmp.return_value.__enter__.return_value = mock_tmp
             docs = process_pdf_bytes(b"fake pdf", source="test.pdf")
 
@@ -36,9 +38,11 @@ class TestProcessPdfBytes:
         from src.document_processor import process_pdf_bytes
 
         converter, mock_tmp = self._make_text("Text.")
-        with patch("src.document_processor._get_converter", return_value=converter), \
-                patch("src.document_processor.tempfile.NamedTemporaryFile") as MockTmp, \
-                patch("src.document_processor.Path.unlink"):
+        with (
+            patch("src.document_processor._get_converter", return_value=converter),
+            patch("src.document_processor.tempfile.NamedTemporaryFile") as MockTmp,
+            patch("src.document_processor.Path.unlink"),
+        ):
             MockTmp.return_value.__enter__.return_value = mock_tmp
             docs = process_pdf_bytes(b"fake", source="report.pdf")
 
@@ -53,16 +57,19 @@ class TestProcessPdfBytes:
             Document(page_content="Chunk 1", metadata={}),
         ]
 
-        with patch("src.document_processor._get_converter", return_value=converter), \
-                patch("src.document_processor.RecursiveCharacterTextSplitter") as MockSplitter, \
-                patch("src.document_processor.tempfile.NamedTemporaryFile") as MockTmp, \
-                patch("src.document_processor.Path.unlink"):
+        with (
+            patch("src.document_processor._get_converter", return_value=converter),
+            patch("src.document_processor.RecursiveCharacterTextSplitter") as MockSplitter,
+            patch("src.document_processor.tempfile.NamedTemporaryFile") as MockTmp,
+            patch("src.document_processor.Path.unlink"),
+        ):
             MockTmp.return_value.__enter__.return_value = mock_tmp
             MockSplitter.return_value = mock_splitter
             docs = process_pdf_bytes(b"fake")
 
         MockSplitter.assert_called_once_with(
-            chunk_size=1000, chunk_overlap=200,
+            chunk_size=1000,
+            chunk_overlap=200,
             separators=["\n\n", "\n", " ", ""],
         )
         assert docs == [Document(page_content="Chunk 1", metadata={})]
@@ -71,9 +78,11 @@ class TestProcessPdfBytes:
         from src.document_processor import process_pdf_bytes
 
         converter, mock_tmp = self._make_text("Text")
-        with patch("src.document_processor._get_converter", return_value=converter), \
-                patch("src.document_processor.tempfile.NamedTemporaryFile") as MockTmp, \
-                patch("src.document_processor.Path.unlink") as MockUnlink:
+        with (
+            patch("src.document_processor._get_converter", return_value=converter),
+            patch("src.document_processor.tempfile.NamedTemporaryFile") as MockTmp,
+            patch("src.document_processor.Path.unlink") as MockUnlink,
+        ):
             MockTmp.return_value.__enter__.return_value = mock_tmp
             process_pdf_bytes(b"data")
 
@@ -86,20 +95,24 @@ class TestProcessPdfBytes:
         converter, mock_tmp = self._make_text()
         converter.convert.side_effect = RuntimeError("parse error")
 
-        with patch("src.document_processor._get_converter", return_value=converter), \
-                patch("src.document_processor.tempfile.NamedTemporaryFile") as MockTmp, \
-                patch("src.document_processor.Path.unlink"):
+        with (
+            patch("src.document_processor._get_converter", return_value=converter),
+            patch("src.document_processor.tempfile.NamedTemporaryFile") as MockTmp,
+            patch("src.document_processor.Path.unlink"),
+        ):
             MockTmp.return_value.__enter__.return_value = mock_tmp
-            with pytest.raises(Exception):
+            with pytest.raises(RuntimeError, match="parse error"):
                 process_pdf_bytes(b"bad")
 
     def test_empty_output_returns_empty_list(self):
         from src.document_processor import process_pdf_bytes
 
         converter, mock_tmp = self._make_text("   ")
-        with patch("src.document_processor._get_converter", return_value=converter), \
-                patch("src.document_processor.tempfile.NamedTemporaryFile") as MockTmp, \
-                patch("src.document_processor.Path.unlink"):
+        with (
+            patch("src.document_processor._get_converter", return_value=converter),
+            patch("src.document_processor.tempfile.NamedTemporaryFile") as MockTmp,
+            patch("src.document_processor.Path.unlink"),
+        ):
             MockTmp.return_value.__enter__.return_value = mock_tmp
             docs = process_pdf_bytes(b"empty pdf")
 

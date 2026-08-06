@@ -8,23 +8,29 @@ class TestGetVectorStore:
 
     def test_returns_supabase_vector_store(self):
         """Should return a SupabaseVectorStore instance."""
-        with patch("src.vector_store.SupabaseVectorStore") as MockVS, \
-                patch("src.vector_store.NVIDIAEmbeddings"), \
-                patch("src.vector_store.create_client"):
+        with (
+            patch("src.vector_store.SupabaseVectorStore") as MockVS,
+            patch("src.vector_store.NVIDIAEmbeddings"),
+            patch("src.vector_store.create_client"),
+        ):
             mock_instance = MagicMock()
             MockVS.return_value = mock_instance
 
             from src.vector_store import get_vector_store
+
             result = get_vector_store()
 
         assert result is mock_instance
 
     def test_initializes_supabase_with_env_vars(self):
         """Should create the Supabase client with URL and service key."""
-        with patch("src.vector_store.SupabaseVectorStore"), \
-                patch("src.vector_store.NVIDIAEmbeddings"), \
-                patch("src.vector_store.create_client") as MockCreate:
+        with (
+            patch("src.vector_store.SupabaseVectorStore"),
+            patch("src.vector_store.NVIDIAEmbeddings"),
+            patch("src.vector_store.create_client") as MockCreate,
+        ):
             from src.vector_store import get_vector_store
+
             get_vector_store()
 
         args, kwargs = MockCreate.call_args
@@ -33,10 +39,13 @@ class TestGetVectorStore:
 
     def test_initializes_nvidia_embeddings(self):
         """Should create NVIDIA embeddings with model, base URL, and API key."""
-        with patch("src.vector_store.SupabaseVectorStore"), \
-                patch("src.vector_store.NVIDIAEmbeddings") as MockEmb, \
-                patch("src.vector_store.create_client"):
+        with (
+            patch("src.vector_store.SupabaseVectorStore"),
+            patch("src.vector_store.NVIDIAEmbeddings") as MockEmb,
+            patch("src.vector_store.create_client"),
+        ):
             from src.vector_store import get_vector_store
+
             get_vector_store()
 
         MockEmb.assert_called_once_with(
@@ -47,9 +56,11 @@ class TestGetVectorStore:
 
     def test_vector_store_configured_correctly(self):
         """Should pass correct params to SupabaseVectorStore."""
-        with patch("src.vector_store.SupabaseVectorStore") as MockVS, \
-                patch("src.vector_store.NVIDIAEmbeddings") as MockEmb, \
-                patch("src.vector_store.create_client") as MockCreate:
+        with (
+            patch("src.vector_store.SupabaseVectorStore") as MockVS,
+            patch("src.vector_store.NVIDIAEmbeddings") as MockEmb,
+            patch("src.vector_store.create_client") as MockCreate,
+        ):
             mock_supabase = MagicMock()
             MockCreate.return_value = mock_supabase
 
@@ -57,6 +68,7 @@ class TestGetVectorStore:
             MockEmb.return_value = mock_embeddings
 
             from src.vector_store import get_vector_store
+
             get_vector_store()
 
         MockVS.assert_called_once_with(
@@ -78,6 +90,7 @@ class TestSaveChunksToDatabase:
             MockGetVS.return_value = mock_vs
 
             from src.vector_store import save_chunks_to_database
+
             save_chunks_to_database(sample_chunks)
 
         mock_vs.add_documents.assert_called_once_with(sample_chunks)
@@ -89,6 +102,7 @@ class TestSaveChunksToDatabase:
             MockGetVS.return_value = mock_vs
 
             from src.vector_store import save_chunks_to_database
+
             save_chunks_to_database([])
 
         MockGetVS.assert_not_called()

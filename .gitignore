@@ -1,27 +1,51 @@
-# Python
+# ---- Python -----------------------------------------------------------
 __pycache__/
 *.py[cod]
+*$py.class
 *.egg-info/
+*.egg
+build/
+dist/
 .venv/
 venv/
 env/
+.eggs/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
 
-# Test / quality tooling
+# ---- Test / quality tooling -------------------------------------------
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
-.coverage
-htmlcov/
-.dist/
+.bandit_cache/
 
-# Secrets — never commit
+# ---- Secrets — never commit -------------------------------------------
 .env
 .env.local
+.env.*.local
 *.pem
+*.key
 
-# Streamlit
+# ---- Streamlit ----------------------------------------------------------
 .streamlit/secrets.toml
+streamlit_err.txt
+streamlit_out.txt
 
-# OS
+# ---- IDEs / editors -----------------------------------------------------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ---- OS ----------------------------------------------------------------
 .DS_Store
 Thumbs.db
+.DS_Store?

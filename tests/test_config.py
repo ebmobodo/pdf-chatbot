@@ -1,7 +1,6 @@
 """Tests for src.config.Settings."""
 
 import pytest
-
 from src.config import Settings
 
 
@@ -13,7 +12,7 @@ class TestSettings:
         settings = Settings.from_env()
 
         assert settings.supabase_url == "value"
-        assert settings.llm_model == "gemini-1.5-flash"
+        assert settings.llm_model == "gemini-2.5-flash"
         assert settings.llm_temperature == 0.3
         assert settings.embed_model == "nvidia/nv-embedqa-e5-v5"
         assert settings.embed_base_url == "https://integrate.api.nvidia.com/v1"
