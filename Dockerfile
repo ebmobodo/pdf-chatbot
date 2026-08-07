@@ -27,9 +27,14 @@ RUN pip install --no-cache-dir --upgrade pip \
 COPY . .
 
 # ---- Runtime ---------------------------------------------------------
-EXPOSE 10000
+# EXPOSE is informational only — Render routes to the port from $PORT
+# (default 10000, or the override set in render.yaml). 8500 is the local
+# default used when PORT is unset (see scripts/start.sh).
+EXPOSE 8500
 
+# Healthcheck must probe whatever port the app actually bound to ($PORT),
+# not a hardcoded one, or the container is marked unhealthy on Render (502).
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=5 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8500/_stcore/health', timeout=5)" || exit 1
+    CMD python -c "import os, urllib.request; urllib.request.urlopen('http://localhost:' + os.environ.get('PORT', '8500') + '/_stcore/health', timeout=5)" || exit 1
 
 CMD ["bash", "scripts/start.sh"]

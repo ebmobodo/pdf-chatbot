@@ -1,6 +1,6 @@
 """Centralized application configuration.
 
-All external service credentials (Supabase, NVIDIA, Google) and tunable
+All external service credentials (Supabase, NVIDIA, Google, Groq) and tunable
 pipeline parameters are read from the environment here so that no secrets
 or settings are hardcoded across the codebase.
 
@@ -24,6 +24,7 @@ load_dotenv()
 
 DEFAULT_LLM_MODEL = "gemini-2.5-flash"
 DEFAULT_LLM_TEMPERATURE = 0.3
+DEFAULT_FALLBACK_LLM_MODEL = "llama-3.3-70b-versatile"
 DEFAULT_EMBED_MODEL = "nvidia/nv-embedqa-e5-v5"
 DEFAULT_EMBED_BASE_URL = "https://integrate.api.nvidia.com/v1"
 DEFAULT_CHUNK_SIZE = 1000
@@ -91,6 +92,9 @@ class Settings:
     llm_model: str = DEFAULT_LLM_MODEL
     llm_temperature: float = DEFAULT_LLM_TEMPERATURE
 
+    groq_api_key: str = ""
+    fallback_llm_model: str = DEFAULT_FALLBACK_LLM_MODEL
+
     embed_model: str = DEFAULT_EMBED_MODEL
     embed_base_url: str = DEFAULT_EMBED_BASE_URL
 
@@ -113,6 +117,8 @@ class Settings:
             nvidia_api_key=os.getenv("NVIDIA_API_KEY", ""),
             llm_model=os.getenv("LLM_MODEL", DEFAULT_LLM_MODEL),
             llm_temperature=_get_float("LLM_TEMPERATURE", DEFAULT_LLM_TEMPERATURE),
+            groq_api_key=os.getenv("GROQ_API_KEY", ""),
+            fallback_llm_model=os.getenv("FALLBACK_LLM_MODEL", DEFAULT_FALLBACK_LLM_MODEL),
             embed_model=os.getenv("EMBED_MODEL", DEFAULT_EMBED_MODEL),
             embed_base_url=os.getenv("EMBED_BASE_URL", DEFAULT_EMBED_BASE_URL),
             chunk_size=_get_int("CHUNK_SIZE", DEFAULT_CHUNK_SIZE),

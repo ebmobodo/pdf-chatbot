@@ -6,6 +6,8 @@ set -euo pipefail
 
 PORT="${PORT:-8500}"
 
+echo "Starting Streamlit on 0.0.0.0:${PORT} (Render routes via \$PORT)"
+
 exec streamlit run app.py \
   --server.port="${PORT}" \
   --server.address=0.0.0.0 \
