@@ -2,8 +2,9 @@
 
 This guide walks through deploying the **PDF Chat Bot** to Render as a
 Docker web service. Render builds the image from the repository's
-`Dockerfile` and runs `scripts/start.sh`, which serves Streamlit on
-`PORT` (default **8500**).
+`Dockerfile` and runs `scripts/start.sh`, which binds Streamlit to host
+`0.0.0.0` on the port from the `PORT` environment variable (default
+**8500** locally).
 
 ---
 
@@ -21,6 +22,12 @@ Docker web service. Render builds the image from the repository's
   | `SUPABASE_URL`      | Supabase project → Settings → API |
   | `SUPABASE_SERVICE_KEY` | Supabase project → Settings → API → `service_role` key |
 
+  Plus one optional (recommended) fallback credential:
+
+  | Variable         | Where to get it |
+  | ---------------- | --------------- |
+  | `GROQ_API_KEY`   | <https://console.groq.com/keys> — used only if the Gemini call fails |
+
 ---
 
 ## 2. Deploy with the Blueprint (`render.yaml`)
@@ -32,7 +39,8 @@ it to your GitHub repo and let Render pick it up:
 2. In the Render dashboard, go to **New → Blueprint** and select the repo.
 3. Render creates the web service from `render.yaml`:
    - runtime: **docker**
-   - `PORT=8500`
+   - `PORT=8500` (overrides Render's default of `10000`; `scripts/start.sh`
+     binds to whatever `$PORT` resolves to on host `0.0.0.0`)
    - `healthCheckPath=/_stcore/health`
    - plan: **free**
 4. Render will create the service but it **will not start yet** — the four
@@ -71,10 +79,17 @@ The API keys have `sync: false` in `render.yaml` — they are intentionally
    | ---- | ------- |
    | `LLM_MODEL` | `gemini-2.5-flash` |
    | `LLM_TEMPERATURE` | `0.3` |
+   | `GROQ_API_KEY` | your Groq key (enables the fallback LLM) |
+   | `FALLBACK_LLM_MODEL` | `llama-3.3-70b-versatile` |
    | `EMBED_MODEL` | `nvidia/nv-embedqa-e5-v5` |
    | `CHUNK_SIZE` | `1000` |
    | `CHUNK_OVERLAP` | `200` |
    | `OCR_ENABLED` | `true` |
+
+> **Fallback behavior:** `src/llm_chain.py` always calls the primary Gemini
+> model first. If that call raises (rate limit, bad key, downtime), the
+> request automatically retries on Groq when `GROQ_API_KEY` is set. Without a
+> Groq key the app logs a warning at startup and runs Gemini-only.
 
 > **OCR caveat:** the Dockerfile does **not** install the OCR system
 > packages (`poppler-utils`, `tesseract-ocr`). With `OCR_ENABLED=true` but
@@ -139,7 +154,9 @@ service → **Manual Deploy** or the **Restart** button in the service menu.
   `.env`; always pass credentials via Render env vars / secrets.
 - **Pin dependencies:** `requirements.txt` is locked; bump deliberately.
 - **Health check:** `/_stcore/health` is used by Render; keep it reachable
-  (Streamlit exposes it by default).
+  (Streamlit exposes it by default). The `Dockerfile` healthcheck probes the
+  same endpoint on the port from `$PORT`, so it stays correct even if the
+  injected `PORT` differs from the default.
 
 ---
 
@@ -151,7 +168,7 @@ service → **Manual Deploy** or the **Restart** button in the service menu.
 | `Missing required environment variable(s)` | Vars not set or not redeployed | Add vars, then **Manual Deploy → Clear build cache & deploy** |
 | `httpx.ConnectError: getaddrinfo failed` | Supabase URL hostname unreachable / typo | Confirm `SUPABASE_URL`, check network egress |
 | `401 Invalid API key` | Wrong/rotated key | Rotate the key, update the env var, redeploy |
-| Health check failing | Port mismatch | `PORT` must be set to 8500; app listens on `$PORT` via `scripts/start.sh` |
+| Health check failing | Port mismatch | The Docker healthcheck and Render both probe `$PORT`; ensure the app actually bound `0.0.0.0:$PORT` (check logs for the `Starting Streamlit on 0.0.0.0:...` line). Do not hardcode another port |
 | Empty answers / "no context" | Nothing embedded yet, or OCR disabled on scanned PDFs | Process a PDF first; enable `OCR_ENABLED=true` |
 | OCR returns empty on scanned pages | `poppler-utils`/`tesseract-ocr` missing in image | Add them to the `Dockerfile`; they are not installed by default |
 | Port already in use (local) | Another process on 8500 | Run with `-e PORT=8501 -p 8501:8501` |

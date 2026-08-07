@@ -5,9 +5,9 @@ lets users upload a PDF, ask natural-language questions about it, and get
 answer grounded strictly in the document's content.
 
 Built with **Streamlit**, **LangChain**, **Supabase (pgvector)**, **NVIDIA
-NIM embeddings**, and **Google Gemini**, with an optional **OCR fallback**
-for scanned documents. Containerized for deployment to **Render**
-(Docker Web Service).
+NIM embeddings**, and **Google Gemini** (primary LLM, with an automatic
+**Groq fallback**), plus an optional **OCR fallback** for scanned
+documents. Containerized for deployment to **Render** (Docker Web Service).
 
 ---
 
@@ -31,10 +31,11 @@ for scanned documents. Containerized for deployment to **Render**
               └─────────────────────┬───────────────────────┘
                                     │ retrieval (match_documents)
                                     ▼
-              ┌─────────────────────────────────────────────┐
-              │ src.llm_chain.py  (Gemini RAG chain)        │
-              │  context + question ──► grounded answer     │
-              └─────────────────────────┬───────────────────┘
+               ┌─────────────────────────────────────────────┐
+               │ src.llm_chain.py  (Gemini RAG chain)        │
+               │  Gemini primary → Groq fallback on failure  │
+               │  context + question ──► grounded answer     │
+               └─────────────────────────┬───────────────────┘
                                         ▼
                                Streamlit chat UI
 ```
@@ -49,10 +50,10 @@ pdf-chatbot/
 │   ├── document_processor.py  # PDF ingestion + chunking
 │   ├── ocr.py                 # Optional OCR pipeline (scanned pages)
 │   ├── vector_store.py        # Supabase + NVIDIA embeddings integration
-│   └── llm_chain.py           # Gemini RAG chain
+│   └── llm_chain.py           # Gemini RAG chain w/ Groq fallback
 ├── tests/                     # pytest suite (mocked external services)
 ├── scripts/
-│   └── start.sh               # Production entrypoint (port 8500)
+│   └── start.sh               # Entrypoint: reads $PORT, binds 0.0.0.0
 ├── Dockerfile                 # Render-optimized production image
 ├── .dockerignore
 ├── requirements.txt           # Locked runtime dependencies
@@ -68,10 +69,12 @@ pdf-chatbot/
 
 - Python 3.11+ (3.13 recommended for local dev)
 - Accounts / API keys:
-  - **Google** (`GOOGLE_API_KEY`) — Gemini LLM
+  - **Google** (`GOOGLE_API_KEY`) — Gemini LLM (primary)
   - **NVIDIA** (`NVIDIA_API_KEY`) — embeddings
   - **Supabase** project (`SUPABASE_URL`, `SUPABASE_SERVICE_KEY`) with the
     `documents` table and `match_documents` pgvector function
+  - **Groq** (`GROQ_API_KEY`) — optional fallback LLM used when Gemini is
+    rate-limited or unavailable
 - Optional for OCR: `poppler-utils` and `tesseract-ocr` system packages
 
 ## Local development
@@ -109,8 +112,10 @@ ruff check .
 | `NVIDIA_API_KEY`        |   yes    | —                                | NVIDIA NIM API key                   |
 | `SUPABASE_URL`          |   yes    | —                                | Supabase project URL                 |
 | `SUPABASE_SERVICE_KEY`  |   yes    | —                                | Supabase service-role key            |
-| `LLM_MODEL`             |   no     | `gemini-2.5-flash`               | Gemini model                         |
+| `LLM_MODEL`             |   no     | `gemini-2.5-flash`               | Primary Gemini model                |
 | `LLM_TEMPERATURE`       |   no     | `0.3`                            | LLM sampling temperature             |
+| `GROQ_API_KEY`          |   no     | —                                | Groq API key (enables fallback)      |
+| `FALLBACK_LLM_MODEL`    |   no     | `llama-3.3-70b-versatile`        | Groq model used when Gemini fails    |
 | `EMBED_MODEL`           |   no     | `nvidia/nv-embedqa-e5-v5`        | NVIDIA embedding model               |
 | `EMBED_BASE_URL`        |   no     | `https://integrate.api.nvidia.com/v1` | NVIDIA NIM endpoint             |
 | `CHUNK_SIZE`            |   no     | `1000`                           | Text splitter chunk size             |
