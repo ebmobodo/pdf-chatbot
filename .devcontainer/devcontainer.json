@@ -9,9 +9,9 @@
     "dockerfile": "Dockerfile",
     "context": ".."
   },
-  "forwardPorts": [8500],
+  "forwardPorts": [10000],
   "portsAttributes": {
-    "8500": {
+    "10000": {
       "label": "Streamlit",
       "onAutoForward": "notify"
     }

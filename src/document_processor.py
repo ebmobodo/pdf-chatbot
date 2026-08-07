@@ -1,64 +1,75 @@
-"""PDF ingestion pipeline powered by Docling.
+"""PDF ingestion pipeline.
 
-Uses IBM Docling's ``DocumentConverter`` for enterprise-grade PDF parsing:
-layout-aware text extraction, built-in OCR (via RapidOCR), table structure
-preservation, and structured markdown output. Replaces the previous pypdf
-+ pytesseract stack with a single unified pipeline.
+Extracts text with ``pypdf`` (lightweight, pure-Python — keeps the image well
+under Render's 512 MB free-tier RAM limit). Pages with no embedded text layer
+(scanned PDFs) are sent through OCR in :mod:`src.ocr` when ``OCR_ENABLED=true``.
+
+Replaces the previous Docling stack, which pulled in a large ML dependency
+footprint that risked OOM crashes on Render's free tier.
 """
 
 from __future__ import annotations
 
+import io
 import logging
-import tempfile
-from pathlib import Path
 
-from docling.document_converter import DocumentConverter
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from pypdf import PdfReader
 
 from src.config import get_settings
+from src.ocr import extract_text_from_pdf_page
 
 logger = logging.getLogger(__name__)
 
-_converter: DocumentConverter | None = None
 
-
-def _get_converter() -> DocumentConverter:
-    global _converter
-    if _converter is None:
-        logger.info("Initialising Docling DocumentConverter…")
-        _converter = DocumentConverter()
-    return _converter
+def _extract_page_text(page: object) -> str:
+    """Return stripped text from a pypdf page, tolerating parse errors."""
+    extract_text = getattr(page, "extract_text", None)
+    if extract_text is None:
+        return ""
+    try:
+        return (extract_text() or "").strip()
+    except Exception:
+        logger.exception("pypdf failed to extract text from a page; treating it as blank.")
+        return ""
 
 
 def process_pdf_bytes(file_bytes: bytes, source: str = "uploaded.pdf") -> list[Document]:
-    """Parse a PDF with Docling and split the resulting markdown into chunks.
+    """Parse a PDF with pypdf and split the extracted text into chunks.
 
     Args:
         file_bytes: Raw PDF file content.
         source: Original filename, stored in each chunk's metadata.
 
     Returns:
-        A list of LangChain ``Document`` chunks ready for embedding.
+        A list of LangChain ``Document`` chunks ready for embedding. Returns an
+        empty list when the PDF has no extractable text (e.g. a scanned PDF with
+        ``OCR_ENABLED=false``).
+
+    Raises:
+        pypdf.errors.PdfReadError: If ``file_bytes`` is not a readable PDF.
     """
     settings = get_settings()
 
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-        tmp.write(file_bytes)
-        tmp_path = Path(tmp.name)
+    reader = PdfReader(io.BytesIO(file_bytes))
+    page_texts: list[str] = []
+    for index, page in enumerate(reader.pages):
+        text = _extract_page_text(page)
+        if not text and settings.ocr_enabled:
+            text = extract_text_from_pdf_page(
+                file_bytes,
+                page_index=index,
+                dpi=settings.ocr_dpi,
+                language=settings.ocr_language,
+            )
+        page_texts.append(text)
 
-    try:
-        converter = _get_converter()
-        result = converter.convert(str(tmp_path))
-        text = result.document.export_to_markdown()
-    except Exception:
-        logger.exception("Docling failed to parse %s", source)
-        raise
-    finally:
-        tmp_path.unlink(missing_ok=True)
-
+    text = "\n\n".join(page_text for page_text in page_texts if page_text)
     if not text.strip():
-        logger.warning("Docling produced empty output for %s", source)
+        logger.warning(
+            "No text extracted from %s (is it scanned? Enable OCR_ENABLED=true).", source
+        )
         return []
 
     doc = Document(page_content=text, metadata={"source": source})

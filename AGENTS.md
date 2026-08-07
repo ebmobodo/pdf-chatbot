@@ -31,7 +31,7 @@ CI runs all four for Python 3.12 (`lint`, `typecheck`, `test`, `build`) in
   `FALLBACK_LLM_MODEL`, `EMBED_MODEL`, `EMBED_BASE_URL`, chunking, OCR, `POSTGREST_TIMEOUT`.
 - Local dev: set in `.env` (loaded via `python-dotenv` in `src/config.py`).
 - Tests pin fake credentials via the autouse `_set_env_vars` fixture in `tests/conftest.py`.
-  Never make real network calls — mock Supabase / NVIDIA / Gemini / Groq / Docling.
+  Never make real network calls — mock Supabase / NVIDIA / Gemini / Groq / OCR.
 
 ## Testing
 - `tests/` mirrors `src/` layout (`test_config.py` ↔ `src/config.py`). Add a matching
@@ -60,18 +60,18 @@ centralized in `src/config.py`.
 - Commits: Conventional Commits, e.g. `feat(ocr): add multi-language Tesseract support`.
 
 ## Docker / Deploy (Render — NOT Hugging Face Spaces)
-- Production entrypoint: `scripts/start.sh` — reads `$PORT` (default **8500**), binds host
-  `0.0.0.0`, and logs the bound address for debugging.
-- Deployment is via **Render** `render.yaml` (Docker web service): sets `PORT=8500`,
+- Production entrypoint: `scripts/start.sh` — reads `$PORT` (default **10000**, Render's default
+  web-service port), binds host `0.0.0.0`, and logs the bound address for debugging.
+- Deployment is via **Render** `render.yaml` (Docker web service): sets `PORT=10000`,
   `healthCheckPath=/_stcore/health`, free tier. API keys have `sync: false` — set them in the
   Render dashboard, not in this file.
 - The `Dockerfile` is the Render image source. Its healthcheck probes `/_stcore/health` on
-  `$PORT` (not a hardcoded port), so it stays correct when Render injects a different `PORT`
-  (default 10000; `render.yaml` overrides to 8500). `EXPOSE 8500` is informational only.
+  `$PORT` (not a hardcoded port), so it stays correct when Render injects a different `PORT`.
+  `EXPOSE 10000` is informational only.
 - Local image run: `docker build -t pdf-chatbot .` then
-  `docker run --rm -p 8500:8500 -e PORT=8500 -e GOOGLE_API_KEY=... -e NVIDIA_API_KEY=... -e SUPABASE_URL=... -e SUPABASE_SERVICE_KEY=... pdf-chatbot`.
-- OCR: requires system packages `poppler-utils` + `tesseract-ocr`, which are **not** installed by the
-  Dockerfile; without them OCR degrades gracefully. Enable via `OCR_ENABLED=true`.
+  `docker run --rm -p 10000:10000 -e PORT=10000 -e GOOGLE_API_KEY=... -e NVIDIA_API_KEY=... -e SUPABASE_URL=... -e SUPABASE_SERVICE_KEY=... pdf-chatbot`.
+- OCR: `poppler-utils` + `tesseract-ocr` are installed by the Dockerfile;
+  enable via `OCR_ENABLED=true` (blank pages are OCR'd, text pages use pypdf).
 
 ## Known technical debt
 - `langchain-community` (used for `SupabaseVectorStore`) is sunset; migrate `src/vector_store.py`

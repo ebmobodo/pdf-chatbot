@@ -4,7 +4,7 @@ This guide walks through deploying the **PDF Chat Bot** to Render as a
 Docker web service. Render builds the image from the repository's
 `Dockerfile` and runs `scripts/start.sh`, which binds Streamlit to host
 `0.0.0.0` on the port from the `PORT` environment variable (default
-**8500** locally).
+**10000**, matching Render's default web-service port).
 
 ---
 
@@ -30,7 +30,37 @@ Docker web service. Render builds the image from the repository's
 
 ---
 
-## 2. Deploy with the Blueprint (`render.yaml`)
+## 2. Set up the database (one-time, before first deploy)
+
+The app stores PDF chunks in a Supabase **pgvector** table named `documents`
+and searches it via the `match_documents` RPC function (see
+`src/vector_store.py`). You must create them before uploading any PDFs or the
+app will fail with a missing table / function error.
+
+The migration lives at
+[`supabase/migrations/20260807000000_create_documents_table.sql`](./supabase/migrations/20260807000000_create_documents_table.sql)
+and creates everything the app needs:
+
+- `public.documents` (`id uuid`, `content text`, `metadata jsonb`,
+  `embedding vector(1024)`) — dimension matches the default
+  `nvidia/nv-embedqa-e5-v5` embedding model
+- HNSW index on the embedding (cosine) + GIN index on `metadata`
+- `match_documents(query_embedding, match_count, filter)` similarity function
+- RLS enabled; only `service_role` can read/write (the app uses the
+  `service_role` key), `anon`/`authenticated` are blocked
+
+Apply it with **either**:
+
+```bash
+# Option A: Supabase dashboard -> SQL Editor -> paste the file -> Run
+# Option B: supabase CLI (auto-applies everything under supabase/migrations/)
+supabase link --project-ref <project-ref>
+supabase db push
+```
+
+---
+
+## 3. Deploy with the Blueprint (`render.yaml`)
 
 `render.yaml` defines the whole service. The recommended path is to push
 it to your GitHub repo and let Render pick it up:
@@ -39,7 +69,7 @@ it to your GitHub repo and let Render pick it up:
 2. In the Render dashboard, go to **New → Blueprint** and select the repo.
 3. Render creates the web service from `render.yaml`:
    - runtime: **docker**
-   - `PORT=8500` (overrides Render's default of `10000`; `scripts/start.sh`
+   - `PORT=10000` (Render's default web-service port; `scripts/start.sh`
      binds to whatever `$PORT` resolves to on host `0.0.0.0`)
    - `healthCheckPath=/_stcore/health`
    - plan: **free**
@@ -58,7 +88,7 @@ it to your GitHub repo and let Render pick it up:
 
 ---
 
-## 3. Set the required environment variables
+## 4. Set the required environment variables
 
 The API keys have `sync: false` in `render.yaml` — they are intentionally
 **not** committed to the repo. Set them in the Render dashboard:
@@ -91,19 +121,19 @@ The API keys have `sync: false` in `render.yaml` — they are intentionally
 > request automatically retries on Groq when `GROQ_API_KEY` is set. Without a
 > Groq key the app logs a warning at startup and runs Gemini-only.
 
-> **OCR caveat:** the Dockerfile does **not** install the OCR system
-> packages (`poppler-utils`, `tesseract-ocr`). With `OCR_ENABLED=true` but
-> no packages, OCR degrades gracefully (falls back to pypdf text). To fully
-> enable OCR in production you must add those packages to the `Dockerfile`.
+> **OCR caveat:** the Dockerfile installs `poppler-utils` + `tesseract-ocr`,
+> so OCR for scanned PDFs works out of the box in production. Set
+> `OCR_ENABLED=true` to enable it (blank pages are OCR'd automatically;
+> text-based PDFs still use the fast `pypdf` path).
 
 ---
 
-## 4. Test the image locally (optional but recommended)
+## 5. Test the image locally (optional but recommended)
 
 ```bash
 docker build -t pdf-chatbot .
-docker run --rm -p 8500:8500 \
-  -e PORT=8500 \
+docker run --rm -p 10000:10000 \
+  -e PORT=10000 \
   -e GOOGLE_API_KEY=... \
   -e NVIDIA_API_KEY=... \
   -e SUPABASE_URL=... \
@@ -111,13 +141,13 @@ docker run --rm -p 8500:8500 \
   pdf-chatbot
 ```
 
-Open <http://localhost:8500>, upload a PDF, and confirm the chat works
+Open <http://localhost:10000>, upload a PDF, and confirm the chat works
 before deploying. Verify the health endpoint too:
-`curl http://localhost:8500/_stcore/health`.
+`curl http://localhost:10000/_stcore/health`.
 
 ---
 
-## 5. Deploy & trigger builds
+## 6. Deploy & trigger builds
 
 - **Auto-deploy:** after the service is created, every push to the
   connected branch triggers a new build and release.
@@ -130,7 +160,7 @@ The app is live at `https://<service-name>.onrender.com`.
 
 ---
 
-## 6. Rolling out updates
+## 7. Rolling out updates
 
 ```bash
 git add .
@@ -143,7 +173,7 @@ service → **Manual Deploy** or the **Restart** button in the service menu.
 
 ---
 
-## 7. Scaling & hardening notes
+## 8. Scaling & hardening notes
 
 - **Sleep / cold start:** the free tier sleeps after 15 minutes of
   inactivity; the next request wakes it (takes ~30–60 s). A `cron-job.org`
@@ -160,7 +190,7 @@ service → **Manual Deploy** or the **Restart** button in the service menu.
 
 ---
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 | Symptom | Likely cause | Fix |
 | ------- | ------------ | --- |
@@ -170,8 +200,8 @@ service → **Manual Deploy** or the **Restart** button in the service menu.
 | `401 Invalid API key` | Wrong/rotated key | Rotate the key, update the env var, redeploy |
 | Health check failing | Port mismatch | The Docker healthcheck and Render both probe `$PORT`; ensure the app actually bound `0.0.0.0:$PORT` (check logs for the `Starting Streamlit on 0.0.0.0:...` line). Do not hardcode another port |
 | Empty answers / "no context" | Nothing embedded yet, or OCR disabled on scanned PDFs | Process a PDF first; enable `OCR_ENABLED=true` |
-| OCR returns empty on scanned pages | `poppler-utils`/`tesseract-ocr` missing in image | Add them to the `Dockerfile`; they are not installed by default |
-| Port already in use (local) | Another process on 8500 | Run with `-e PORT=8501 -p 8501:8501` |
+| OCR returns empty on scanned pages | `OCR_ENABLED` not set, or OCR skipped for that page | Set `OCR_ENABLED=true` and redeploy; the image ships `poppler-utils` + `tesseract-ocr` |
+| Port already in use (local) | Another process on 10000 | Run with `-e PORT=10001 -p 10001:10001` |
 
 ---
 

@@ -27,3 +27,6 @@ htmlcov/
 run_streamlit.bat
 streamlit_err.txt
 streamlit_out.txt
+
+# Database migrations / supabase CLI config (applied on Supabase, not shipped)
+supabase/

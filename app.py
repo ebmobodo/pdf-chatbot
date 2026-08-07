@@ -2,7 +2,7 @@
 
 Run locally with ``streamlit run app.py`` or inside Docker
 (see Dockerfile). Uses ``$PORT`` from the environment (Render
-default: 8500).
+default: 10000).
 """
 
 from __future__ import annotations

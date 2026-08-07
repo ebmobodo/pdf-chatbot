@@ -1,0 +1,19 @@
+# Production Streamlit configuration (also used locally unless overridden on the CLI).
+#
+# These settings fix the three common Render 502 / crash causes:
+#   - fileWatcherType = "none"  -> no inotify watcher, so we never hit the
+#                                  "inotify instance limit reached" crash
+#   - address = "0.0.0.0"       -> bind all interfaces so Render's proxy can
+#                                  reach the app
+#   - headless = true           -> no interactive setup prompt in production
+
+[server]
+headless = true
+address = "0.0.0.0"
+fileWatcherType = "none"
+enableCORS = false
+enableXsrfProtection = false
+
+# Disable anonymous usage stats (privacy + a little less chatter).
+[browser]
+gatherUsageStats = false

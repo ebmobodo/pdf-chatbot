@@ -129,14 +129,14 @@ ruff check .
 
 ```bash
 docker build -t pdf-chatbot .
-docker run --rm -p 8500:8500 \
-  -e PORT=8500 \
+docker run --rm -p 10000:10000 \
+  -e PORT=10000 \
   -e GOOGLE_API_KEY=... \
   -e NVIDIA_API_KEY=... \
   -e SUPABASE_URL=... \
   -e SUPABASE_SERVICE_KEY=... \
   pdf-chatbot
-# open http://localhost:8500
+# open http://localhost:10000
 ```
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for the full Render setup.
