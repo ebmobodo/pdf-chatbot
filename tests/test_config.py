@@ -14,6 +14,8 @@ class TestSettings:
         assert settings.supabase_url == "value"
         assert settings.llm_model == "gemini-2.5-flash"
         assert settings.llm_temperature == 0.3
+        assert settings.groq_api_key == ""
+        assert settings.fallback_llm_model == "llama-3.3-70b-versatile"
         assert settings.embed_model == "nvidia/nv-embedqa-e5-v5"
         assert settings.embed_base_url == "https://integrate.api.nvidia.com/v1"
         assert settings.chunk_size == 1000
@@ -28,6 +30,8 @@ class TestSettings:
             monkeypatch.setenv(key, "value")
         monkeypatch.setenv("LLM_MODEL", "gemini-2.0-flash")
         monkeypatch.setenv("LLM_TEMPERATURE", "0.7")
+        monkeypatch.setenv("GROQ_API_KEY", "test-groq-key")
+        monkeypatch.setenv("FALLBACK_LLM_MODEL", "llama-3.1-8b-instant")
         monkeypatch.setenv("EMBED_MODEL", "custom-model")
         monkeypatch.setenv("CHUNK_SIZE", "512")
         monkeypatch.setenv("CHUNK_OVERLAP", "64")
@@ -40,6 +44,8 @@ class TestSettings:
 
         assert settings.llm_model == "gemini-2.0-flash"
         assert settings.llm_temperature == 0.7
+        assert settings.groq_api_key == "test-groq-key"
+        assert settings.fallback_llm_model == "llama-3.1-8b-instant"
         assert settings.embed_model == "custom-model"
         assert settings.chunk_size == 512
         assert settings.chunk_overlap == 64
