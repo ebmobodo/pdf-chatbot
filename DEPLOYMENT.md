@@ -4,7 +4,7 @@ This guide walks through deploying the **PDF Chat Bot** to Render as a
 Docker web service. Render builds the image from the repository's
 `Dockerfile` and runs `scripts/start.sh`, which binds Streamlit to host
 `0.0.0.0` on the port from the `PORT` environment variable (default
-**8500** locally).
+**10000**, matching Render's default web-service port).
 
 ---
 
@@ -39,7 +39,7 @@ it to your GitHub repo and let Render pick it up:
 2. In the Render dashboard, go to **New → Blueprint** and select the repo.
 3. Render creates the web service from `render.yaml`:
    - runtime: **docker**
-   - `PORT=8500` (overrides Render's default of `10000`; `scripts/start.sh`
+   - `PORT=10000` (Render's default web-service port; `scripts/start.sh`
      binds to whatever `$PORT` resolves to on host `0.0.0.0`)
    - `healthCheckPath=/_stcore/health`
    - plan: **free**
@@ -91,10 +91,10 @@ The API keys have `sync: false` in `render.yaml` — they are intentionally
 > request automatically retries on Groq when `GROQ_API_KEY` is set. Without a
 > Groq key the app logs a warning at startup and runs Gemini-only.
 
-> **OCR caveat:** the Dockerfile does **not** install the OCR system
-> packages (`poppler-utils`, `tesseract-ocr`). With `OCR_ENABLED=true` but
-> no packages, OCR degrades gracefully (falls back to pypdf text). To fully
-> enable OCR in production you must add those packages to the `Dockerfile`.
+> **OCR caveat:** the Dockerfile installs `poppler-utils` + `tesseract-ocr`,
+> so OCR for scanned PDFs works out of the box in production. Set
+> `OCR_ENABLED=true` to enable it (blank pages are OCR'd automatically;
+> text-based PDFs still use the fast `pypdf` path).
 
 ---
 
@@ -102,8 +102,8 @@ The API keys have `sync: false` in `render.yaml` — they are intentionally
 
 ```bash
 docker build -t pdf-chatbot .
-docker run --rm -p 8500:8500 \
-  -e PORT=8500 \
+docker run --rm -p 10000:10000 \
+  -e PORT=10000 \
   -e GOOGLE_API_KEY=... \
   -e NVIDIA_API_KEY=... \
   -e SUPABASE_URL=... \
@@ -111,9 +111,9 @@ docker run --rm -p 8500:8500 \
   pdf-chatbot
 ```
 
-Open <http://localhost:8500>, upload a PDF, and confirm the chat works
+Open <http://localhost:10000>, upload a PDF, and confirm the chat works
 before deploying. Verify the health endpoint too:
-`curl http://localhost:8500/_stcore/health`.
+`curl http://localhost:10000/_stcore/health`.
 
 ---
 
@@ -170,8 +170,8 @@ service → **Manual Deploy** or the **Restart** button in the service menu.
 | `401 Invalid API key` | Wrong/rotated key | Rotate the key, update the env var, redeploy |
 | Health check failing | Port mismatch | The Docker healthcheck and Render both probe `$PORT`; ensure the app actually bound `0.0.0.0:$PORT` (check logs for the `Starting Streamlit on 0.0.0.0:...` line). Do not hardcode another port |
 | Empty answers / "no context" | Nothing embedded yet, or OCR disabled on scanned PDFs | Process a PDF first; enable `OCR_ENABLED=true` |
-| OCR returns empty on scanned pages | `poppler-utils`/`tesseract-ocr` missing in image | Add them to the `Dockerfile`; they are not installed by default |
-| Port already in use (local) | Another process on 8500 | Run with `-e PORT=8501 -p 8501:8501` |
+| OCR returns empty on scanned pages | `OCR_ENABLED` not set, or OCR skipped for that page | Set `OCR_ENABLED=true` and redeploy; the image ships `poppler-utils` + `tesseract-ocr` |
+| Port already in use (local) | Another process on 10000 | Run with `-e PORT=10001 -p 10001:10001` |
 
 ---
 

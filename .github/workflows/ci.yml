@@ -88,8 +88,8 @@ jobs:
 
       - name: Smoke test container start
         run: |
-          docker run -d --name pdf-chatbot-smoke -p 8500:8500 \
-            -e PORT=8500 \
+          docker run -d --name pdf-chatbot-smoke -p 10000:10000 \
+            -e PORT=10000 \
             -e GOOGLE_API_KEY=ci-placeholder \
             -e NVIDIA_API_KEY=ci-placeholder \
             -e SUPABASE_URL=https://placeholder.supabase.co \
