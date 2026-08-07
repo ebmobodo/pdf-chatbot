@@ -30,7 +30,37 @@ Docker web service. Render builds the image from the repository's
 
 ---
 
-## 2. Deploy with the Blueprint (`render.yaml`)
+## 2. Set up the database (one-time, before first deploy)
+
+The app stores PDF chunks in a Supabase **pgvector** table named `documents`
+and searches it via the `match_documents` RPC function (see
+`src/vector_store.py`). You must create them before uploading any PDFs or the
+app will fail with a missing table / function error.
+
+The migration lives at
+[`supabase/migrations/20260807000000_create_documents_table.sql`](./supabase/migrations/20260807000000_create_documents_table.sql)
+and creates everything the app needs:
+
+- `public.documents` (`id uuid`, `content text`, `metadata jsonb`,
+  `embedding vector(1024)`) — dimension matches the default
+  `nvidia/nv-embedqa-e5-v5` embedding model
+- HNSW index on the embedding (cosine) + GIN index on `metadata`
+- `match_documents(query_embedding, match_count, filter)` similarity function
+- RLS enabled; only `service_role` can read/write (the app uses the
+  `service_role` key), `anon`/`authenticated` are blocked
+
+Apply it with **either**:
+
+```bash
+# Option A: Supabase dashboard -> SQL Editor -> paste the file -> Run
+# Option B: supabase CLI (auto-applies everything under supabase/migrations/)
+supabase link --project-ref <project-ref>
+supabase db push
+```
+
+---
+
+## 3. Deploy with the Blueprint (`render.yaml`)
 
 `render.yaml` defines the whole service. The recommended path is to push
 it to your GitHub repo and let Render pick it up:
@@ -58,7 +88,7 @@ it to your GitHub repo and let Render pick it up:
 
 ---
 
-## 3. Set the required environment variables
+## 4. Set the required environment variables
 
 The API keys have `sync: false` in `render.yaml` — they are intentionally
 **not** committed to the repo. Set them in the Render dashboard:
@@ -98,7 +128,7 @@ The API keys have `sync: false` in `render.yaml` — they are intentionally
 
 ---
 
-## 4. Test the image locally (optional but recommended)
+## 5. Test the image locally (optional but recommended)
 
 ```bash
 docker build -t pdf-chatbot .
@@ -117,7 +147,7 @@ before deploying. Verify the health endpoint too:
 
 ---
 
-## 5. Deploy & trigger builds
+## 6. Deploy & trigger builds
 
 - **Auto-deploy:** after the service is created, every push to the
   connected branch triggers a new build and release.
@@ -130,7 +160,7 @@ The app is live at `https://<service-name>.onrender.com`.
 
 ---
 
-## 6. Rolling out updates
+## 7. Rolling out updates
 
 ```bash
 git add .
@@ -143,7 +173,7 @@ service → **Manual Deploy** or the **Restart** button in the service menu.
 
 ---
 
-## 7. Scaling & hardening notes
+## 8. Scaling & hardening notes
 
 - **Sleep / cold start:** the free tier sleeps after 15 minutes of
   inactivity; the next request wakes it (takes ~30–60 s). A `cron-job.org`
@@ -160,7 +190,7 @@ service → **Manual Deploy** or the **Restart** button in the service menu.
 
 ---
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 | Symptom | Likely cause | Fix |
 | ------- | ------------ | --- |
