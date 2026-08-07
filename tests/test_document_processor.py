@@ -1,4 +1,4 @@
-"""Tests for src.document_processor.process_pdf_bytes (Docling-based)."""
+"""Tests for src.document_processor.process_pdf_bytes (pypdf-based)."""
 
 from unittest.mock import MagicMock, patch
 
@@ -7,27 +7,24 @@ from langchain_core.documents import Document
 
 
 class TestProcessPdfBytes:
-    def _make_text(self, text="Some sample text from the document."):
-        mock_result = MagicMock()
-        mock_result.document.export_to_markdown.return_value = text
-        mock_converter = MagicMock()
-        mock_converter.convert.return_value = mock_result
-        mock_tmp = MagicMock()
-        mock_tmp.name = "C:\\tmp\\test.pdf"
-        return mock_converter, mock_tmp
+    @staticmethod
+    def _reader(*page_texts: str) -> MagicMock:
+        reader = MagicMock()
+        pages = []
+        for text in page_texts:
+            page = MagicMock()
+            page.extract_text.return_value = text
+            pages.append(page)
+        reader.pages = pages
+        return reader
 
     # ------------------------------------------------------------------
 
     def test_returns_list_of_documents(self):
         from src.document_processor import process_pdf_bytes
 
-        converter, mock_tmp = self._make_text()
-        with (
-            patch("src.document_processor._get_converter", return_value=converter),
-            patch("src.document_processor.tempfile.NamedTemporaryFile") as MockTmp,
-            patch("src.document_processor.Path.unlink"),
-        ):
-            MockTmp.return_value.__enter__.return_value = mock_tmp
+        reader = self._reader("Some sample text from the document.")
+        with patch("src.document_processor.PdfReader", return_value=reader):
             docs = process_pdf_bytes(b"fake pdf", source="test.pdf")
 
         assert len(docs) == 1
@@ -37,33 +34,34 @@ class TestProcessPdfBytes:
     def test_metadata_tracks_source(self):
         from src.document_processor import process_pdf_bytes
 
-        converter, mock_tmp = self._make_text("Text.")
-        with (
-            patch("src.document_processor._get_converter", return_value=converter),
-            patch("src.document_processor.tempfile.NamedTemporaryFile") as MockTmp,
-            patch("src.document_processor.Path.unlink"),
-        ):
-            MockTmp.return_value.__enter__.return_value = mock_tmp
+        reader = self._reader("Text.")
+        with patch("src.document_processor.PdfReader", return_value=reader):
             docs = process_pdf_bytes(b"fake", source="report.pdf")
 
         assert docs[0].metadata == {"source": "report.pdf"}
 
+    def test_multiple_pages_are_joined(self):
+        from src.document_processor import process_pdf_bytes
+
+        reader = self._reader("Page one", "Page two")
+        with patch("src.document_processor.PdfReader", return_value=reader):
+            docs = process_pdf_bytes(b"two pages")
+
+        assert "Page one\n\nPage two" in docs[0].page_content
+
     def test_splitter_parameters(self):
         from src.document_processor import process_pdf_bytes
 
-        converter, mock_tmp = self._make_text("Text.")
+        reader = self._reader("Text.")
         mock_splitter = MagicMock()
         mock_splitter.split_documents.return_value = [
             Document(page_content="Chunk 1", metadata={}),
         ]
 
         with (
-            patch("src.document_processor._get_converter", return_value=converter),
+            patch("src.document_processor.PdfReader", return_value=reader),
             patch("src.document_processor.RecursiveCharacterTextSplitter") as MockSplitter,
-            patch("src.document_processor.tempfile.NamedTemporaryFile") as MockTmp,
-            patch("src.document_processor.Path.unlink"),
         ):
-            MockTmp.return_value.__enter__.return_value = mock_tmp
             MockSplitter.return_value = mock_splitter
             docs = process_pdf_bytes(b"fake")
 
@@ -74,46 +72,80 @@ class TestProcessPdfBytes:
         )
         assert docs == [Document(page_content="Chunk 1", metadata={})]
 
-    def test_temp_file_cleaned_up(self):
+    def test_empty_output_returns_empty_list(self):
         from src.document_processor import process_pdf_bytes
 
-        converter, mock_tmp = self._make_text("Text")
-        with (
-            patch("src.document_processor._get_converter", return_value=converter),
-            patch("src.document_processor.tempfile.NamedTemporaryFile") as MockTmp,
-            patch("src.document_processor.Path.unlink") as MockUnlink,
-        ):
-            MockTmp.return_value.__enter__.return_value = mock_tmp
-            process_pdf_bytes(b"data")
+        reader = self._reader("   ")
+        with patch("src.document_processor.PdfReader", return_value=reader):
+            docs = process_pdf_bytes(b"empty pdf")
 
-        MockTmp.return_value.__enter__.return_value.write.assert_called_once_with(b"data")
-        MockUnlink.assert_called_once_with(missing_ok=True)
+        assert docs == []
+
+    def test_blank_page_uses_ocr_when_enabled(self, monkeypatch):
+        from src.document_processor import process_pdf_bytes
+
+        monkeypatch.setenv("OCR_ENABLED", "true")
+        reader = self._reader("")
+        with (
+            patch("src.document_processor.PdfReader", return_value=reader),
+            patch(
+                "src.document_processor.extract_text_from_pdf_page",
+                return_value="OCR text",
+            ) as mock_ocr,
+        ):
+            docs = process_pdf_bytes(b"scanned", source="scan.pdf")
+
+        assert "OCR text" in docs[0].page_content
+        mock_ocr.assert_called_once_with(b"scanned", page_index=0, dpi=300, language="eng")
+
+    def test_ocr_not_called_when_text_present(self):
+        from src.document_processor import process_pdf_bytes
+
+        reader = self._reader("Real text")
+        with (
+            patch("src.document_processor.PdfReader", return_value=reader),
+            patch("src.document_processor.extract_text_from_pdf_page") as mock_ocr,
+        ):
+            process_pdf_bytes(b"texty")
+
+        mock_ocr.assert_not_called()
+
+    def test_page_extract_error_is_treated_as_blank(self):
+        from src.document_processor import process_pdf_bytes
+
+        page = MagicMock()
+        page.extract_text.side_effect = RuntimeError("boom")
+        reader = MagicMock()
+        reader.pages = [page]
+
+        with (
+            patch("src.document_processor.PdfReader", return_value=reader),
+            patch("src.document_processor.extract_text_from_pdf_page") as mock_ocr,
+        ):
+            docs = process_pdf_bytes(b"pdf")
+
+        assert docs == []
+        mock_ocr.assert_not_called()
+
+    def test_page_without_extract_text_is_blank(self):
+        from src.document_processor import process_pdf_bytes
+
+        reader = MagicMock()
+        reader.pages = [object()]
+
+        with patch("src.document_processor.PdfReader", return_value=reader):
+            docs = process_pdf_bytes(b"pdf")
+
+        assert docs == []
 
     def test_invalid_pdf_raises(self):
         from src.document_processor import process_pdf_bytes
 
-        converter, mock_tmp = self._make_text()
-        converter.convert.side_effect = RuntimeError("parse error")
-
         with (
-            patch("src.document_processor._get_converter", return_value=converter),
-            patch("src.document_processor.tempfile.NamedTemporaryFile") as MockTmp,
-            patch("src.document_processor.Path.unlink"),
+            patch(
+                "src.document_processor.PdfReader",
+                side_effect=RuntimeError("not a pdf"),
+            ),
+            pytest.raises(RuntimeError, match="not a pdf"),
         ):
-            MockTmp.return_value.__enter__.return_value = mock_tmp
-            with pytest.raises(RuntimeError, match="parse error"):
-                process_pdf_bytes(b"bad")
-
-    def test_empty_output_returns_empty_list(self):
-        from src.document_processor import process_pdf_bytes
-
-        converter, mock_tmp = self._make_text("   ")
-        with (
-            patch("src.document_processor._get_converter", return_value=converter),
-            patch("src.document_processor.tempfile.NamedTemporaryFile") as MockTmp,
-            patch("src.document_processor.Path.unlink"),
-        ):
-            MockTmp.return_value.__enter__.return_value = mock_tmp
-            docs = process_pdf_bytes(b"empty pdf")
-
-        assert docs == []
+            process_pdf_bytes(b"bad")

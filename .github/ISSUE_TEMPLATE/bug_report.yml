@@ -38,7 +38,7 @@ body:
       label: Component
       description: Which part of the app is affected?
       options:
-        - PDF upload / processing (Docling)
+        - PDF upload / processing (pypdf)
         - OCR fallback
         - Vector store / Supabase
         - LLM / Gemini chain

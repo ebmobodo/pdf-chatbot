@@ -40,9 +40,10 @@ the reporter before public disclosure.
   `.dockerignore`d.
 - **Service-role key:** The Supabase `service_role` key bypasses RLS. Keep
   it out of any client-facing code and rotate it immediately if exposed.
-- **Untrusted PDFs:** Uploaded PDFs are parsed server-side by Docling. Keep
-  `docling` and its dependencies up to date (Dependabot + `pip-audit` in CI)
-  to mitigate parser vulnerabilities.
+- **Untrusted PDFs:** Uploaded PDFs are parsed server-side by `pypdf` and
+  (optionally) OCR'd with `pdf2image` + `pytesseract`. Keep them and their
+  dependencies up to date (Dependabot + `pip-audit` in CI) to mitigate parser
+  vulnerabilities.
 - **Dependency scanning:** CI runs `pip-audit`, bandit, and GitHub CodeQL
   on every push to `main` and on pull requests.
 

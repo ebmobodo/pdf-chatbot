@@ -68,7 +68,7 @@ reviewed and merged.
 - **Type checking:** mypy against `src/` using the config in
   `pyproject.toml`. New functions should have type annotations.
 - **Testing:** pytest with fixtures in `tests/conftest.py`. External
-  services (Supabase, NVIDIA, Gemini, Docling) **must be mocked** in tests —
+  services (Supabase, NVIDIA, Gemini, Groq, OCR) **must be mocked** in tests —
   never make real network calls.
 - **Formatting conventions:**
   - 4-space indentation, UTF-8, LF line endings.
