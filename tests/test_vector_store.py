@@ -1,9 +1,9 @@
 """Tests for src.vector_store."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
-from src.vector_store import extract_hostname, validate_dns
+from src.vector_store import ensure_https_url, extract_hostname, validate_dns
 
 
 class TestExtractHostname:
@@ -27,6 +27,35 @@ class TestExtractHostname:
     def test_returns_empty_string(self):
         """Should return an empty string when the input is empty."""
         assert extract_hostname("") == ""
+
+
+class TestEnsureHttpsUrl:
+    """Tests for vector_store.ensure_https_url."""
+
+    def test_returns_https_url_unchanged(self):
+        """Should keep the full https:// URL intact."""
+        url = "https://project.supabase.co"
+        assert ensure_https_url(url, "SUPABASE_URL") == url
+
+    def test_keeps_path_and_other_components(self):
+        """Should not strip path/port from an https URL."""
+        url = "https://integrate.api.nvidia.com/v1/embeddings"
+        assert ensure_https_url(url, "EMBED_BASE_URL") == url
+
+    def test_rejects_scheme_less_url(self):
+        """Should raise when the URL is missing the https:// prefix."""
+        with pytest.raises(RuntimeError, match="SUPABASE_URL"):
+            ensure_https_url("test.supabase.co", "SUPABASE_URL")
+
+    def test_rejects_http_url(self):
+        """Should raise for a plain http:// URL."""
+        with pytest.raises(RuntimeError, match="https://"):
+            ensure_https_url("http://api.nvidia.com/v1", "EMBED_BASE_URL")
+
+    def test_rejects_empty_string(self):
+        """Should raise when the URL is empty."""
+        with pytest.raises(RuntimeError, match="EMBED_BASE_URL"):
+            ensure_https_url("", "EMBED_BASE_URL")
 
 
 class TestValidateDNS:
@@ -148,6 +177,36 @@ class TestGetVectorStore:
             query_name="match_documents",
             chunk_size=10,
         )
+
+    def test_validates_dns_with_full_urls(self):
+        """Should pass full https:// URLs to validate_dns, never pre-stripped hosts."""
+        with (
+            patch("src.vector_store.SupabaseVectorStore"),
+            patch("src.vector_store.NVIDIAEmbeddings"),
+            patch("src.vector_store.create_client"),
+            patch("src.vector_store.validate_dns") as MockValidate,
+        ):
+            from src.vector_store import get_vector_store
+
+            get_vector_store()
+
+        MockValidate.assert_has_calls(
+            [
+                call("https://test.supabase.co", service="Supabase"),
+                call(
+                    "https://integrate.api.nvidia.com/v1",
+                    service="NVIDIA embeddings",
+                ),
+            ]
+        )
+
+    def test_raises_when_supabase_url_is_not_https(self, monkeypatch):
+        """Should fail fast when SUPABASE_URL is missing the https:// prefix."""
+        monkeypatch.setenv("SUPABASE_URL", "test.supabase.co")
+        from src.vector_store import get_vector_store
+
+        with pytest.raises(RuntimeError, match="SUPABASE_URL"):
+            get_vector_store()
 
 
 class TestSaveChunksToDatabase:

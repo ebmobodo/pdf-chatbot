@@ -8,6 +8,11 @@ hardcoded here.
 Before making any network call the target hosts are resolved up front so a
 misconfigured/malformed URL (the classic ``[Errno -2] Name or service not
 known`` crash) fails fast with a clear message instead of a bare DNS error.
+
+``SUPABASE_URL`` and ``EMBED_BASE_URL`` are always passed to the external
+SDKs (``create_client`` and ``NVIDIAEmbeddings``) verbatim — the full
+``https://`` URL is never stripped or rewritten. Hostname extraction happens
+only inside :func:`validate_dns`, purely to feed ``socket.getaddrinfo``.
 """
 
 from __future__ import annotations
@@ -51,17 +56,42 @@ def extract_hostname(url_or_host: str) -> str:
     return parsed.hostname or url_or_host
 
 
-def validate_dns(host: str, *, service: str) -> None:
-    """Resolve ``host`` so connection errors fail fast with context.
+def ensure_https_url(url: str, env_var: str) -> str:
+    """Validate that ``url`` is a full ``https://`` URL and return it unchanged.
 
-    ``host`` may be a full URL or a bare hostname; the hostname is extracted
-    first so a ``https://`` prefix or an explicit port never breaks
-    ``socket.getaddrinfo``.
+    Only checks the format; the URL itself is never rewritten, so callers can
+    pass the returned value straight to external SDKs with the ``https://``
+    prefix intact.
+
+    Args:
+        url: The configured URL to validate.
+        env_var: The environment variable name for clear error messages.
+
+    Returns:
+        ``url`` unchanged.
+
+    Raises:
+        RuntimeError: When ``url`` is not a full ``https://`` URL.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise RuntimeError(f"{env_var} must be a full URL starting with 'https://' (got {url!r}).")
+    return url
+
+
+def validate_dns(url: str, *, service: str) -> None:
+    """Resolve the host behind ``url`` so connection errors fail fast.
+
+    ``url`` may be a full URL or a bare hostname. The hostname is extracted
+    here, via :func:`extract_hostname` (``urllib.parse.urlparse``), only to
+    feed ``socket.getaddrinfo`` — the original ``url`` string is never
+    modified, so the full ``https://`` value can still be passed on to the
+    external SDKs unchanged.
 
     Raises:
         RuntimeError: When DNS resolution fails (``socket.gaierror``).
     """
-    hostname = extract_hostname(host)
+    hostname = extract_hostname(url)
     try:
         socket.getaddrinfo(hostname, 443)
     except socket.gaierror as exc:
@@ -69,14 +99,15 @@ def validate_dns(host: str, *, service: str) -> None:
         logger.exception("DNS resolution failed for %s host %r.", service, hostname)
         raise RuntimeError(
             f"Cannot resolve host '{hostname}' for {service} ({exc}). Check "
-            f"that {env_var} is set to a reachable, publicly resolvable URL."
+            f"that {env_var} is set to a reachable, publicly resolvable URL "
+            "starting with 'https://'."
         ) from exc
 
 
-def _build_embeddings(settings: Settings) -> NVIDIAEmbeddings:
+def _build_embeddings(settings: Settings, base_url: str) -> NVIDIAEmbeddings:
     return NVIDIAEmbeddings(
         model=settings.embed_model,
-        base_url=settings.embed_base_url,
+        base_url=base_url,
         nvidia_api_key=settings.nvidia_api_key,
     )
 
@@ -85,27 +116,28 @@ def get_vector_store() -> SupabaseVectorStore:
     """Build the application vector store backed by Supabase + NVIDIA embeddings."""
     settings = get_settings()
 
-    supabase_host = extract_hostname(settings.supabase_url)
-    embed_host = extract_hostname(settings.embed_base_url)
+    supabase_url = ensure_https_url(settings.supabase_url, "SUPABASE_URL")
+    embed_base_url = ensure_https_url(settings.embed_base_url, "EMBED_BASE_URL")
+
     logger.info(
         "Connecting to Supabase at host=%s and NVIDIA embeddings at host=%s.",
-        supabase_host,
-        embed_host,
+        extract_hostname(supabase_url),
+        extract_hostname(embed_base_url),
     )
 
-    validate_dns(supabase_host, service="Supabase")
-    validate_dns(embed_host, service="NVIDIA embeddings")
+    validate_dns(supabase_url, service="Supabase")
+    validate_dns(embed_base_url, service="NVIDIA embeddings")
 
     options = ClientOptions(postgrest_client_timeout=settings.postgrest_timeout)
     supabase = create_client(
-        settings.supabase_url,
+        supabase_url,
         settings.supabase_service_key,
         options=options,
     )
 
     return SupabaseVectorStore(
         client=supabase,
-        embedding=_build_embeddings(settings),
+        embedding=_build_embeddings(settings, embed_base_url),
         table_name=TABLE_NAME,
         query_name=QUERY_NAME,
         chunk_size=EMBED_BATCH_SIZE,
