@@ -116,7 +116,7 @@ ruff check .
 | `LLM_TEMPERATURE`       |   no     | `0.3`                            | LLM sampling temperature             |
 | `GROQ_API_KEY`          |   no     | —                                | Groq API key (enables fallback)      |
 | `FALLBACK_LLM_MODEL`    |   no     | `llama-3.3-70b-versatile`        | Groq model used when Gemini fails    |
-| `EMBED_MODEL`           |   no     | `nvidia/nv-embedqa-e5-v5`        | NVIDIA embedding model               |
+| `EMBED_MODEL`           |   no     | `nvidia/nemotron-3-embed-1b`     | NVIDIA embedding model               |
 | `EMBED_BASE_URL`        |   no     | `https://integrate.api.nvidia.com/v1` | NVIDIA NIM endpoint             |
 | `CHUNK_SIZE`            |   no     | `1000`                           | Text splitter chunk size             |
 | `CHUNK_OVERLAP`         |   no     | `200`                            | Text splitter chunk overlap          |

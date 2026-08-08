@@ -93,7 +93,7 @@ class TestGetVectorStore:
             get_vector_store()
 
         MockEmb.assert_called_once_with(
-            model="nvidia/nv-embedqa-e5-v5",
+            model="nvidia/nemotron-3-embed-1b",
             base_url="https://integrate.api.nvidia.com/v1",
             nvidia_api_key="test-nvidia-key",
         )
