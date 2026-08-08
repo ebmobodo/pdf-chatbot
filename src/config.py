@@ -25,7 +25,7 @@ load_dotenv()
 DEFAULT_LLM_MODEL = "gemini-2.5-flash"
 DEFAULT_LLM_TEMPERATURE = 0.3
 DEFAULT_FALLBACK_LLM_MODEL = "llama-3.3-70b-versatile"
-DEFAULT_EMBED_MODEL = "nvidia/nv-embedqa-e5-v5"
+DEFAULT_EMBED_MODEL = "nvidia/nemotron-3-embed-1b"
 DEFAULT_EMBED_BASE_URL = "https://integrate.api.nvidia.com/v1"
 DEFAULT_CHUNK_SIZE = 1000
 DEFAULT_CHUNK_OVERLAP = 200

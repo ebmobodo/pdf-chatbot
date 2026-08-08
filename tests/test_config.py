@@ -16,7 +16,7 @@ class TestSettings:
         assert settings.llm_temperature == 0.3
         assert settings.groq_api_key == ""
         assert settings.fallback_llm_model == "llama-3.3-70b-versatile"
-        assert settings.embed_model == "nvidia/nv-embedqa-e5-v5"
+        assert settings.embed_model == "nvidia/nemotron-3-embed-1b"
         assert settings.embed_base_url == "https://integrate.api.nvidia.com/v1"
         assert settings.chunk_size == 1000
         assert settings.chunk_overlap == 200

@@ -42,8 +42,8 @@ The migration lives at
 and creates everything the app needs:
 
 - `public.documents` (`id uuid`, `content text`, `metadata jsonb`,
-  `embedding vector(1024)`) — dimension matches the default
-  `nvidia/nv-embedqa-e5-v5` embedding model
+   `embedding vector(2048)`) — dimension matches the default
+   `nvidia/nemotron-3-embed-1b` embedding model
 - HNSW index on the embedding (cosine) + GIN index on `metadata`
 - `match_documents(query_embedding, match_count, filter)` similarity function
 - RLS enabled; only `service_role` can read/write (the app uses the
@@ -111,7 +111,7 @@ The API keys have `sync: false` in `render.yaml` — they are intentionally
    | `LLM_TEMPERATURE` | `0.3` |
    | `GROQ_API_KEY` | your Groq key (enables the fallback LLM) |
    | `FALLBACK_LLM_MODEL` | `llama-3.3-70b-versatile` |
-   | `EMBED_MODEL` | `nvidia/nv-embedqa-e5-v5` |
+   | `EMBED_MODEL` | `nvidia/nemotron-3-embed-1b` |
    | `CHUNK_SIZE` | `1000` |
    | `CHUNK_OVERLAP` | `200` |
    | `OCR_ENABLED` | `true` |
