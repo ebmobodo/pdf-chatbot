@@ -2,6 +2,47 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+from src.vector_store import host_from_url, validate_dns
+
+
+class TestHostFromUrl:
+    """Tests for vector_store.host_from_url."""
+
+    def test_extracts_hostname_from_full_url(self):
+        """Should return the hostname portion of a full URL."""
+        assert host_from_url("https://project.supabase.co:5432") == "project.supabase.co"
+
+    def test_returns_raw_value_for_bare_string(self):
+        """Should fall back to the input when it has no scheme."""
+        assert host_from_url("test.supabase.co") == "test.supabase.co"
+
+    def test_returns_raw_value_for_empty_string(self):
+        """Should return an empty string when the URL is empty."""
+        assert host_from_url("") == ""
+
+
+class TestValidateDNS:
+    """Tests for vector_store.validate_dns."""
+
+    def test_resolves_known_host_without_error(self):
+        """Should call getaddrinfo with the host and port 443."""
+        with patch("src.vector_store.socket.getaddrinfo") as mock_gai:
+            mock_gai.return_value = [(2, 1, 6, "", ("1.2.3.4", 443))]
+            validate_dns("api.nvidia.com", service="NVIDIA embeddings")
+        mock_gai.assert_called_once_with("api.nvidia.com", 443)
+
+    def test_raises_runtime_error_on_dns_failure(self):
+        """Should raise a helpful RuntimeError when getaddrinfo raises gaierror."""
+        with (
+            patch(
+                "src.vector_store.socket.getaddrinfo",
+                side_effect=__import__("socket").gaierror(-2, "Name or service not known"),
+            ),
+            pytest.raises(RuntimeError, match="api.nvidia.com"),
+        ):
+            validate_dns("api.nvidia.com", service="NVIDIA embeddings")
+
 
 class TestGetVectorStore:
     """Tests for vector_store.get_vector_store."""
@@ -12,6 +53,7 @@ class TestGetVectorStore:
             patch("src.vector_store.SupabaseVectorStore") as MockVS,
             patch("src.vector_store.NVIDIAEmbeddings"),
             patch("src.vector_store.create_client"),
+            patch("src.vector_store.validate_dns"),
         ):
             mock_instance = MagicMock()
             MockVS.return_value = mock_instance
@@ -28,6 +70,7 @@ class TestGetVectorStore:
             patch("src.vector_store.SupabaseVectorStore"),
             patch("src.vector_store.NVIDIAEmbeddings"),
             patch("src.vector_store.create_client") as MockCreate,
+            patch("src.vector_store.validate_dns"),
         ):
             from src.vector_store import get_vector_store
 
@@ -43,6 +86,7 @@ class TestGetVectorStore:
             patch("src.vector_store.SupabaseVectorStore"),
             patch("src.vector_store.NVIDIAEmbeddings") as MockEmb,
             patch("src.vector_store.create_client"),
+            patch("src.vector_store.validate_dns"),
         ):
             from src.vector_store import get_vector_store
 
@@ -60,6 +104,7 @@ class TestGetVectorStore:
             patch("src.vector_store.SupabaseVectorStore") as MockVS,
             patch("src.vector_store.NVIDIAEmbeddings") as MockEmb,
             patch("src.vector_store.create_client") as MockCreate,
+            patch("src.vector_store.validate_dns"),
         ):
             mock_supabase = MagicMock()
             MockCreate.return_value = mock_supabase

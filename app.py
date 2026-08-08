@@ -13,7 +13,9 @@ import streamlit as st
 from src.config import get_settings
 from src.document_processor import process_pdf_bytes
 from src.llm_chain import ask_question
-from src.vector_store import get_vector_store, save_chunks_to_database
+from src.vector_store import get_vector_store, host_from_url, save_chunks_to_database
+
+logger = logging.getLogger(__name__)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,8 +48,21 @@ with st.sidebar:
             with st.spinner("Processing PDF…"):
                 docs = process_pdf_bytes(uploaded_file.read(), source=uploaded_file.name)
             save_chunks_to_database(docs)
-        except Exception as exc:
-            st.error(f"Failed to process PDF: {exc}")
+        except Exception:
+            settings = get_settings()
+            supabase_host = host_from_url(settings.supabase_url)
+            embed_host = host_from_url(settings.embed_base_url)
+            logger.exception(
+                "PDF processing failed. Supabase host=%s, NVIDIA embed host=%s.",
+                supabase_host,
+                embed_host,
+            )
+            st.error(
+                "Failed to process PDF. Could not reach one or more services "
+                f"(Supabase: {supabase_host}, NVIDIA embeddings: {embed_host}). "
+                "Check the environment variables SUPABASE_URL and EMBED_BASE_URL "
+                "and view the logs for the full traceback."
+            )
         else:
             st.success(f"Processed {len(docs)} chunks from {uploaded_file.name}")
             st.session_state.pdf_processed = uploaded_file.name
