@@ -22,6 +22,22 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 
+
+def _sanitize_error(exc: Exception) -> str:
+    """Return a safe, single-line description of ``exc`` for the UI.
+
+    Collapses whitespace/newlines (defense against log-injection style
+    payloads) and masks any configured API keys that may appear inside the
+    exception text (e.g. a URL with an embedded key).
+    """
+    text = " ".join(str(exc).split())
+    for key in ("SUPABASE_SERVICE_KEY", "GOOGLE_API_KEY", "NVIDIA_API_KEY", "GROQ_API_KEY"):
+        secret = __import__("os").getenv(key)
+        if secret:
+            text = text.replace(secret, "[REDACTED]")
+    return text or exc.__class__.__name__
+
+
 st.set_page_config(page_title="PDF Chat Bot", page_icon="📄")
 st.title("📄 PDF Chat Bot")
 
@@ -48,7 +64,7 @@ with st.sidebar:
             with st.spinner("Processing PDF…"):
                 docs = process_pdf_bytes(uploaded_file.read(), source=uploaded_file.name)
             save_chunks_to_database(docs)
-        except Exception:
+        except Exception as exc:
             settings = get_settings()
             supabase_host = extract_hostname(settings.supabase_url)
             embed_host = extract_hostname(settings.embed_base_url)
@@ -58,7 +74,8 @@ with st.sidebar:
                 embed_host,
             )
             st.error(
-                "Failed to process PDF. Could not reach one or more services "
+                "Failed to process PDF: "
+                f"{_sanitize_error(exc)} "
                 f"(Supabase: {supabase_host}, NVIDIA embeddings: {embed_host}). "
                 "Check the environment variables SUPABASE_URL and EMBED_BASE_URL "
                 "and view the logs for the full traceback."

@@ -96,9 +96,55 @@ def test_pdf_processing_error_surfaces_helpful_message() -> None:
 
     assert mock_save.called
     error_calls = [c[0][0] for c in st.error.call_args_list]
+    assert any("boom" in message for message in error_calls)
     settings = get_settings()
     assert any(extract_hostname(settings.supabase_url) in message for message in error_calls)
     assert any(extract_hostname(settings.embed_base_url) in message for message in error_calls)
+
+
+def test_pdf_processing_error_shows_real_exception() -> None:
+    """Should surface the underlying exception text, not only a generic message."""
+    st = _make_stub_streamlit()
+    uploaded = MagicMock()
+    uploaded.name = "doc.pdf"
+    uploaded.read.return_value = b"%PDF-1.4 fake"
+    st.file_uploader.return_value = uploaded
+    st.button.return_value = True
+
+    with (
+        _patch_streamlit(st),
+        patch("src.document_processor.process_pdf_bytes") as mock_process,
+        patch("src.vector_store.save_chunks_to_database") as mock_save,
+    ):
+        mock_process.return_value = [MagicMock()]
+        mock_save.side_effect = RuntimeError("400: model 'nvidia/nemotron-3-embed-1b' not found")
+        _load_app()
+
+    error_calls = [c[0][0] for c in st.error.call_args_list]
+    assert any("nvidia/nemotron-3-embed-1b" in message for message in error_calls)
+
+
+def test_sanitize_error_redacts_secrets_and_collapses_newlines() -> None:
+    """Should mask configured API keys and normalize whitespace in error text."""
+    st = _make_stub_streamlit()
+    with _patch_streamlit(st):
+        from app import _sanitize_error
+
+        with patch.dict(
+            "os.environ",
+            {
+                "NVIDIA_API_KEY": "nvapi-secret-key",
+                "GOOGLE_API_KEY": "",
+                "GROQ_API_KEY": "",
+            },
+        ):
+            err = ValueError(
+                "Connection to https://x.example/?key=nvapi-secret-key failed\n  (nope)"
+            )
+            assert _sanitize_error(err) == (
+                "Connection to https://x.example/?key=[REDACTED] failed (nope)"
+            )
+            assert _sanitize_error(RuntimeError()) == "RuntimeError"
 
 
 def test_successful_pdf_processing_notifies_and_marks_processed() -> None:
