@@ -3,23 +3,30 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from src.vector_store import host_from_url, validate_dns
+from src.vector_store import extract_hostname, validate_dns
 
 
-class TestHostFromUrl:
-    """Tests for vector_store.host_from_url."""
+class TestExtractHostname:
+    """Tests for vector_store.extract_hostname."""
 
     def test_extracts_hostname_from_full_url(self):
         """Should return the hostname portion of a full URL."""
-        assert host_from_url("https://project.supabase.co:5432") == "project.supabase.co"
+        assert extract_hostname("https://project.supabase.co:5432") == "project.supabase.co"
 
-    def test_returns_raw_value_for_bare_string(self):
-        """Should fall back to the input when it has no scheme."""
-        assert host_from_url("test.supabase.co") == "test.supabase.co"
+    def test_extracts_hostname_from_url_with_path(self):
+        """Should strip scheme, port, and path from a URL."""
+        assert (
+            extract_hostname("https://integrate.api.nvidia.com/v1/embeddings")
+            == "integrate.api.nvidia.com"
+        )
 
-    def test_returns_raw_value_for_empty_string(self):
-        """Should return an empty string when the URL is empty."""
-        assert host_from_url("") == ""
+    def test_returns_value_for_bare_string(self):
+        """Should return the input unchanged when it has no scheme."""
+        assert extract_hostname("test.supabase.co") == "test.supabase.co"
+
+    def test_returns_empty_string(self):
+        """Should return an empty string when the input is empty."""
+        assert extract_hostname("") == ""
 
 
 class TestValidateDNS:
@@ -32,6 +39,13 @@ class TestValidateDNS:
             validate_dns("api.nvidia.com", service="NVIDIA embeddings")
         mock_gai.assert_called_once_with("api.nvidia.com", 443)
 
+    def test_extracts_hostname_from_full_url_before_resolving(self):
+        """Should strip scheme/port from a URL before calling getaddrinfo."""
+        with patch("src.vector_store.socket.getaddrinfo") as mock_gai:
+            mock_gai.return_value = [(2, 1, 6, "", ("1.2.3.4", 443))]
+            validate_dns("https://api.nvidia.com:8443/v1", service="NVIDIA embeddings")
+        mock_gai.assert_called_once_with("api.nvidia.com", 443)
+
     def test_raises_runtime_error_on_dns_failure(self):
         """Should raise a helpful RuntimeError when getaddrinfo raises gaierror."""
         with (
@@ -40,6 +54,17 @@ class TestValidateDNS:
                 side_effect=__import__("socket").gaierror(-2, "Name or service not known"),
             ),
             pytest.raises(RuntimeError, match="api.nvidia.com"),
+        ):
+            validate_dns("api.nvidia.com", service="NVIDIA embeddings")
+
+    def test_error_message_includes_underlying_issue(self):
+        """Should surface the real exception text, not a hardcoded message."""
+        with (
+            patch(
+                "src.vector_store.socket.getaddrinfo",
+                side_effect=__import__("socket").gaierror(-2, "Name or service not known"),
+            ),
+            pytest.raises(RuntimeError, match="Name or service not known"),
         ):
             validate_dns("api.nvidia.com", service="NVIDIA embeddings")
 
