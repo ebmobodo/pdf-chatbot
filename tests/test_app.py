@@ -14,6 +14,9 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
+from src.config import get_settings
+from src.vector_store import host_from_url
+
 
 @contextmanager
 def _patch_streamlit(st: MagicMock) -> Iterator[None]:
@@ -93,8 +96,9 @@ def test_pdf_processing_error_surfaces_helpful_message() -> None:
 
     assert mock_save.called
     error_calls = [c[0][0] for c in st.error.call_args_list]
-    assert any("test.supabase.co" in message for message in error_calls)
-    assert any("integrate.api.nvidia.com" in message for message in error_calls)
+    settings = get_settings()
+    assert any(host_from_url(settings.supabase_url) in message for message in error_calls)
+    assert any(host_from_url(settings.embed_base_url) in message for message in error_calls)
 
 
 def test_successful_pdf_processing_notifies_and_marks_processed() -> None:
