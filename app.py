@@ -13,7 +13,7 @@ import streamlit as st
 from src.config import get_settings
 from src.document_processor import process_pdf_bytes
 from src.llm_chain import ask_question
-from src.vector_store import get_vector_store, host_from_url, save_chunks_to_database
+from src.vector_store import extract_hostname, get_vector_store, save_chunks_to_database
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +50,8 @@ with st.sidebar:
             save_chunks_to_database(docs)
         except Exception:
             settings = get_settings()
-            supabase_host = host_from_url(settings.supabase_url)
-            embed_host = host_from_url(settings.embed_base_url)
+            supabase_host = extract_hostname(settings.supabase_url)
+            embed_host = extract_hostname(settings.embed_base_url)
             logger.exception(
                 "PDF processing failed. Supabase host=%s, NVIDIA embed host=%s.",
                 supabase_host,
